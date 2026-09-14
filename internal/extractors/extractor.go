@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	projctx "github.com/ctxdev/ctx/internal/context"
+	projctx "github.com/AnshGajera/CTX/internal/context"
 )
 
 // Extractor extracts one section of project context.
@@ -19,11 +19,13 @@ type Extractor interface {
 type Base struct {
 	Root    string
 	Ignored []string
+	ignore  []*ignorePattern
 }
 
 // NewBase creates a Base loading .ctxignore.
 func NewBase(root string) Base {
-	return Base{Root: root, Ignored: LoadIgnore(root)}
+	raw := LoadIgnore(root)
+	return Base{Root: root, Ignored: raw, ignore: compileIgnorePatterns(raw)}
 }
 
 // SkipDirs are never walked.
@@ -60,20 +62,11 @@ func ShouldSkipDir(name string) bool { return SkipDirs[name] }
 
 // ShouldExclude reports if rel path matches ignore patterns.
 func (b Base) ShouldExclude(rel string) bool {
-	rel = filepath.ToSlash(rel)
-	for _, pat := range b.Ignored {
-		p := filepath.ToSlash(pat)
-		if ok, _ := filepath.Match(p, filepath.Base(rel)); ok {
-			return true
-		}
-		if ok, _ := filepath.Match(p, rel); ok {
-			return true
-		}
-		if strings.HasSuffix(p, "/*") && strings.HasPrefix(rel, strings.TrimSuffix(p, "/*")) {
-			return true
-		}
+	if len(b.ignore) > 0 {
+		return matchIgnore(b.ignore, rel)
 	}
-	return false
+	// Fallback for zero-value Base in tests: compile raw patterns on the fly.
+	return matchIgnore(compileIgnorePatterns(b.Ignored), rel)
 }
 
 // WalkFiles walks source files, skipping ignored dirs.

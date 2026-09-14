@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/ctxdev/ctx/internal/versioning"
+	"github.com/AnshGajera/CTX/internal/versioning"
 )
 
 // SyncClient talks to the ctx cloud API.

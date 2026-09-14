@@ -10,7 +10,7 @@ builds:
       - goos: windows
         goarch: arm64
     ldflags:
-      - -s -w -X github.com/ctxdev/ctx/internal/version.Version={{.Version}} -X github.com/ctxdev/ctx/internal/version.Commit={{.Commit}} -X github.com/ctxdev/ctx/internal/version.Date={{.Date}}
+      - -s -w -X github.com/AnshGajera/CTX/internal/version.Version={{.Version}} -X github.com/AnshGajera/CTX/internal/version.Commit={{.Commit}} -X github.com/AnshGajera/CTX/internal/version.Date={{.Date}}
 archives:
   - id: default
     format_overrides:
@@ -24,4 +24,4 @@ checksum:
   algorithm: sha256
 release:
   footer: |
-    Install: `curl -fsSL https://raw.githubusercontent.com/ctxdev/ctx/main/scripts/install.sh | bash`
+    Install: `curl -fsSL https://raw.githubusercontent.com/AnshGajera/CTX/main/scripts/install.sh | bash`

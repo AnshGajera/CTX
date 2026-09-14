@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	projctx "github.com/ctxdev/ctx/internal/context"
-	"github.com/ctxdev/ctx/internal/engine"
-	"github.com/ctxdev/ctx/internal/versioning"
+	projctx "github.com/AnshGajera/CTX/internal/context"
+	"github.com/AnshGajera/CTX/internal/engine"
+	"github.com/AnshGajera/CTX/internal/versioning"
 	"github.com/fsnotify/fsnotify"
 )
 
@@ -119,8 +119,10 @@ func (w *Watcher) Watch(ctx context.Context) error {
 			fmt.Printf("Re-extracted: %d endpoints, %d models\n",
 				countEndpoints(newCtx), countModels(newCtx))
 			if w.autoPush {
-				if _, err := w.store.Commit(newCtx, "watch: auto-update"); err != nil {
+				if _, deduped, err := w.store.Commit(newCtx, "watch: auto-update"); err != nil {
 					fmt.Printf("auto-commit failed: %v\n", err)
+				} else if deduped {
+					fmt.Println("No changes — snapshot not duplicated")
 				} else {
 					fmt.Println("Auto-committed snapshot")
 				}

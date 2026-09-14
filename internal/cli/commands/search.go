@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ctxdev/ctx/internal/ai"
-	"github.com/ctxdev/ctx/internal/config"
-	projctx "github.com/ctxdev/ctx/internal/context"
+	"github.com/AnshGajera/CTX/internal/ai"
+	"github.com/AnshGajera/CTX/internal/config"
+	projctx "github.com/AnshGajera/CTX/internal/context"
 	"github.com/urfave/cli/v2"
 )
 

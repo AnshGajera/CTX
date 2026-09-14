@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	projctx "github.com/ctxdev/ctx/internal/context"
+	"github.com/AnshGajera/CTX/internal/ai"
+	projctx "github.com/AnshGajera/CTX/internal/context"
 )
 
 // DispatchTool executes a tool by name.
@@ -15,7 +16,7 @@ func DispatchTool(ctx *projctx.ProjectContext, name string, args map[string]any)
 	switch name {
 	case "get_project_context":
 		sections := toStringSlice(args["sections"])
-		return FilteredContext(ctx, sections), nil
+		return BudgetedContext(ctx, sections, toInt(args["max_tokens"], 0)), nil
 	case "get_context_for_task":
 		desc, _ := args["task_description"].(string)
 		files := toStringSlice(args["affected_files"])
@@ -38,6 +39,12 @@ func DispatchTool(ctx *projctx.ProjectContext, name string, args map[string]any)
 		return map[string]any{"file_structure": ctx.FileStructure, "patterns": ctx.Patterns}, nil
 	case "get_env_requirements":
 		return ctx.Environment, nil
+	case "search_context":
+		query, _ := args["query"].(string)
+		if strings.TrimSpace(query) == "" {
+			return nil, fmt.Errorf("query is required")
+		}
+		return SearchChunks(ctx, query, toInt(args["top_k"], 5)), nil
 	default:
 		return nil, fmt.Errorf("unknown tool: %s", name)
 	}
@@ -263,4 +270,39 @@ func ifThen(cond bool, a, b string) string {
 		return a
 	}
 	return b
+}
+
+func toInt(v any, def int) int {
+	switch t := v.(type) {
+	case int:
+		return t
+	case int64:
+		return int(t)
+	case float64:
+		return int(t)
+	case nil:
+		return def
+	default:
+		return def
+	}
+}
+
+// SearchChunks ranks chunked context against a query (local TF-IDF).
+func SearchChunks(ctx *projctx.ProjectContext, query string, topK int) any {
+	if topK <= 0 {
+		topK = 5
+	}
+	chunks := ai.NewChunker().Chunk(ctx)
+	ranked := ai.RankTFIDF(chunks, query, topK)
+	out := make([]map[string]any, 0, len(ranked))
+	for _, r := range ranked {
+		out = append(out, map[string]any{
+			"kind":   r.Chunk.Kind,
+			"id":     r.Chunk.ID,
+			"source": r.Chunk.Source,
+			"score":  r.Score,
+			"text":   r.Chunk.Text,
+		})
+	}
+	return map[string]any{"query": query, "results": out}
 }

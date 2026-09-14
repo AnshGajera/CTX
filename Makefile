@@ -1,5 +1,5 @@
 BINARY=ctx
-PKG=github.com/ctxdev/ctx
+PKG=github.com/AnshGajera/CTX
 VERSION?=dev
 COMMIT?=$(shell git rev-parse --short HEAD 2>/dev/null || echo none)
 DATE?=$(shell date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo unknown)

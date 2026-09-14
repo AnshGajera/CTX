@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strings"
 
-	projctx "github.com/ctxdev/ctx/internal/context"
-	"github.com/ctxdev/ctx/internal/versioning"
+	projctx "github.com/AnshGajera/CTX/internal/context"
+	"github.com/AnshGajera/CTX/internal/versioning"
 )
 
 // MCPServer serves context over HTTP.
@@ -56,6 +56,13 @@ func (s *MCPServer) Handler() http.Handler {
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
+		}
+		if budget := r.URL.Query().Get("max_tokens"); budget != "" {
+			var n int
+			if _, err := fmt.Sscanf(budget, "%d", &n); err == nil && n > 0 {
+				writeJSON(w, BudgetedContext(ctx, nil, n))
+				return
+			}
 		}
 		writeJSON(w, ctx)
 	})

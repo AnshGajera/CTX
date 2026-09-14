@@ -5,10 +5,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/ctxdev/ctx/internal/config"
-	projctx "github.com/ctxdev/ctx/internal/context"
-	csync "github.com/ctxdev/ctx/internal/sync"
-	"github.com/ctxdev/ctx/internal/versioning"
+	"github.com/AnshGajera/CTX/internal/config"
+	projctx "github.com/AnshGajera/CTX/internal/context"
+	csync "github.com/AnshGajera/CTX/internal/sync"
+	"github.com/AnshGajera/CTX/internal/versioning"
 	"github.com/fatih/color"
 	"github.com/urfave/cli/v2"
 )
@@ -17,7 +17,7 @@ import (
 func PushCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "push",
-		Usage: "Push context to remote",
+		Usage: "[preview] Push context to remote (needs ctx cloud backend)",
 		Flags: []cli.Flag{
 			&cli.StringFlag{Name: "message", Aliases: []string{"m"}, Usage: "push message"},
 		},
@@ -33,7 +33,7 @@ func PushCommand() *cli.Command {
 				return err
 			}
 			store := versioning.NewContextStore(ctxDir)
-			snap, err := store.Commit(ctx, msg)
+			snap, _, err := store.Commit(ctx, msg)
 			if err != nil {
 				return err
 			}
@@ -62,7 +62,7 @@ func PushCommand() *cli.Command {
 func PullCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "pull",
-		Usage: "Pull latest context from remote",
+		Usage: "[preview] Pull latest context from remote (needs ctx cloud backend)",
 		Action: func(c *cli.Context) error {
 			cwd, _ := os.Getwd()
 			ctxDir := filepath.Join(cwd, ".ctx")

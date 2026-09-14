@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"os"
 
-	projctx "github.com/ctxdev/ctx/internal/context"
-	"github.com/ctxdev/ctx/internal/versioning"
+	projctx "github.com/AnshGajera/CTX/internal/context"
+	"github.com/AnshGajera/CTX/internal/versioning"
 )
 
 // StdioServer implements MCP over JSON-RPC 2.0 stdio.

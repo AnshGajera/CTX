@@ -18,7 +18,8 @@ func ToolDefinitions() []ToolDefinition {
 			Name:        "get_project_context",
 			Description: "Get full or section-filtered project context",
 			InputSchema: obj(map[string]any{
-				"sections": map[string]any{"type": "array", "items": map[string]any{"type": "string", "enum": []string{"architecture", "apis", "database", "dependencies", "environment", "structure", "state", "patterns"}}},
+				"sections":   map[string]any{"type": "array", "items": map[string]any{"type": "string", "enum": []string{"architecture", "apis", "database", "dependencies", "environment", "structure", "state", "patterns"}}},
+				"max_tokens": map[string]any{"type": "integer", "description": "token budget; least-important sections are dropped first"},
 			}, nil),
 		},
 		{
@@ -61,6 +62,14 @@ func ToolDefinitions() []ToolDefinition {
 			Name:        "get_env_requirements",
 			Description: "Get required environment variables",
 			InputSchema: obj(map[string]any{}, nil),
+		},
+		{
+			Name:        "search_context",
+			Description: "Hybrid semantic search over chunked project context (TF-IDF ranking, no sidecar needed)",
+			InputSchema: obj(map[string]any{
+				"query": map[string]any{"type": "string", "description": "natural language query, e.g. 'where is auth handled'"},
+				"top_k": map[string]any{"type": "integer", "description": "max results (default 5)"},
+			}, []string{"query"}),
 		},
 	}
 }

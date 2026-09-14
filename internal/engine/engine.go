@@ -1,17 +1,16 @@
 package engine
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 
-	projctx "github.com/ctxdev/ctx/internal/context"
-	"github.com/ctxdev/ctx/internal/extractors"
+	projctx "github.com/AnshGajera/CTX/internal/context"
+	"github.com/AnshGajera/CTX/internal/extractors"
+	"github.com/AnshGajera/CTX/internal/versioning"
 )
 
 // ExtractionEngine orchestrates extractors.
@@ -23,7 +22,8 @@ type ExtractionEngine struct {
 }
 
 // NewExtractionEngine registers extractors based on profile.
-func NewExtractionEngine(root string, profile *projctx.ProjectProfile) *ExtractionEngine {
+// mlURL enables the sidecar AST extractor ("" disables it).
+func NewExtractionEngine(root string, profile *projctx.ProjectProfile, mlURL string) *ExtractionEngine {
 	e := &ExtractionEngine{root: root, profile: profile}
 	// Always-on
 	e.extractors = append(e.extractors,
@@ -61,6 +61,9 @@ func NewExtractionEngine(root string, profile *projctx.ProjectProfile) *Extracti
 		e.extractors = append(e.extractors, extractors.NewPythonAPI(root))
 	}
 	e.extractors = append(e.extractors, extractors.NewPrisma(root))
+	e.extractors = append(e.extractors, extractors.NewGenericModels(root))
+	// AST precision pass last: merges only endpoints regex missed.
+	e.extractors = append(e.extractors, extractors.NewSidecarAST(root, mlURL))
 	return e
 }
 
@@ -109,7 +112,11 @@ func (e *ExtractionEngine) Extract() (*projctx.ProjectContext, error) {
 		_ = extractors.NewTODO(e.root).Extract(ctx)
 		mu.Unlock()
 	}
-	hash, err := contentHash(ctx)
+	// Deterministic ordering: extractors run concurrently and Go map
+	// iteration is random, so sort everything before hashing. Without
+	// this, identical code produces different hashes on every run.
+	sortContext(ctx)
+	hash, err := versioning.CanonicalHash(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("hash context: %w", err)
 	}
@@ -118,13 +125,86 @@ func (e *ExtractionEngine) Extract() (*projctx.ProjectContext, error) {
 	return ctx, nil
 }
 
-func contentHash(ctx *projctx.ProjectContext) (string, error) {
-	clone := *ctx
-	clone.ContentHash = ""
-	data, err := json.Marshal(clone)
-	if err != nil {
-		return "", err
+// sortContext orders all list fields deterministically.
+func sortContext(ctx *projctx.ProjectContext) {
+	if ctx.APIs != nil {
+		sort.Slice(ctx.APIs.Endpoints, func(i, j int) bool {
+			a, b := ctx.APIs.Endpoints[i], ctx.APIs.Endpoints[j]
+			if a.Method != b.Method {
+				return a.Method < b.Method
+			}
+			if a.Path != b.Path {
+				return a.Path < b.Path
+			}
+			return a.File < b.File
+		})
 	}
-	sum := sha256.Sum256(data)
-	return hex.EncodeToString(sum[:16]), nil
+	if ctx.Database != nil {
+		sort.Slice(ctx.Database.Models, func(i, j int) bool {
+			return ctx.Database.Models[i].Name < ctx.Database.Models[j].Name
+		})
+		for k := range ctx.Database.Models {
+			m := &ctx.Database.Models[k]
+			sort.Slice(m.Fields, func(i, j int) bool { return m.Fields[i].Name < m.Fields[j].Name })
+		}
+		sort.Slice(ctx.Database.Relations, func(i, j int) bool {
+			a, b := ctx.Database.Relations[i], ctx.Database.Relations[j]
+			if a.From != b.From {
+				return a.From < b.From
+			}
+			return a.To < b.To
+		})
+		sort.Slice(ctx.Database.Migrations, func(i, j int) bool {
+			return ctx.Database.Migrations[i].File < ctx.Database.Migrations[j].File
+		})
+	}
+	if ctx.Dependencies != nil {
+		sort.Slice(ctx.Dependencies.Direct, func(i, j int) bool {
+			return ctx.Dependencies.Direct[i].Name < ctx.Dependencies.Direct[j].Name
+		})
+		sort.Slice(ctx.Dependencies.Dev, func(i, j int) bool {
+			return ctx.Dependencies.Dev[i].Name < ctx.Dependencies.Dev[j].Name
+		})
+	}
+	if ctx.Environment != nil {
+		sort.Slice(ctx.Environment.Variables, func(i, j int) bool {
+			return ctx.Environment.Variables[i].Name < ctx.Environment.Variables[j].Name
+		})
+		sort.Strings(ctx.Environment.Required)
+	}
+	if ctx.Patterns != nil {
+		sort.Slice(ctx.Patterns.Patterns, func(i, j int) bool {
+			return ctx.Patterns.Patterns[i].Name < ctx.Patterns.Patterns[j].Name
+		})
+	}
+	if ctx.CurrentState != nil {
+		sort.Strings(ctx.CurrentState.RecentlyChanged)
+		sort.Strings(ctx.CurrentState.ActiveAreas)
+		sort.Slice(ctx.CurrentState.TODOs, func(i, j int) bool {
+			a, b := ctx.CurrentState.TODOs[i], ctx.CurrentState.TODOs[j]
+			if a.File != b.File {
+				return a.File < b.File
+			}
+			return a.Line < b.Line
+		})
+	}
+	if ctx.FileStructure != nil {
+		sort.Slice(ctx.FileStructure.KeyFiles, func(i, j int) bool {
+			return ctx.FileStructure.KeyFiles[i].Path < ctx.FileStructure.KeyFiles[j].Path
+		})
+		sort.Slice(ctx.FileStructure.Conventions, func(i, j int) bool {
+			return ctx.FileStructure.Conventions[i].Pattern < ctx.FileStructure.Conventions[j].Pattern
+		})
+		sortDir(ctx.FileStructure.Tree)
+	}
+}
+
+func sortDir(n *projctx.DirectoryNode) {
+	if n == nil {
+		return
+	}
+	sort.Slice(n.Children, func(i, j int) bool { return n.Children[i].Name < n.Children[j].Name })
+	for _, c := range n.Children {
+		sortDir(c)
+	}
 }

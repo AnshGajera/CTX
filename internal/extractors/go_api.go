@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	projctx "github.com/ctxdev/ctx/internal/context"
+	projctx "github.com/AnshGajera/CTX/internal/context"
 )
 
 // GoAPIExtractor extracts Go HTTP handlers.
@@ -31,7 +31,7 @@ var (
 func (e *GoAPIExtractor) Extract(ctx *projctx.ProjectContext) error {
 	var endpoints []projctx.APIEndpoint
 	_ = e.WalkFiles(func(path, rel string, info os.FileInfo) error {
-		if !strings.HasSuffix(path, ".go") {
+		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 			return nil
 		}
 		f, err := os.Open(path)

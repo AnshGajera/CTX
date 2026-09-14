@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	projctx "github.com/ctxdev/ctx/internal/context"
+	projctx "github.com/AnshGajera/CTX/internal/context"
 )
 
 // EnvironmentExtractor extracts env var structure (never values from .env).

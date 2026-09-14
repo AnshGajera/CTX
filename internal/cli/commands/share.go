@@ -6,8 +6,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/ctxdev/ctx/internal/config"
-	csync "github.com/ctxdev/ctx/internal/sync"
+	"github.com/AnshGajera/CTX/internal/config"
+	csync "github.com/AnshGajera/CTX/internal/sync"
 	"github.com/fatih/color"
 	"github.com/urfave/cli/v2"
 )
@@ -16,7 +16,7 @@ import (
 func ShareCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "share",
-		Usage: "Create a share token",
+		Usage: "[preview] Create a share token (needs ctx cloud backend)",
 		Flags: []cli.Flag{
 			&cli.BoolFlag{Name: "create-token", Usage: "create token via API"},
 			&cli.StringFlag{Name: "name", Usage: "token name"},
@@ -49,7 +49,7 @@ func ShareCommand() *cli.Command {
 func LoginCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "login",
-		Usage: "Login and store credentials",
+		Usage: "[preview] Login and store credentials (needs ctx cloud backend)",
 		Action: func(c *cli.Context) error {
 			reader := bufio.NewReader(os.Stdin)
 			fmt.Print("Email: ")

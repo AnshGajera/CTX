@@ -8,10 +8,11 @@ import (
 	"syscall"
 	"time"
 
-	projctx "github.com/ctxdev/ctx/internal/context"
-	"github.com/ctxdev/ctx/internal/engine"
-	"github.com/ctxdev/ctx/internal/versioning"
-	"github.com/ctxdev/ctx/internal/watcher"
+	"github.com/AnshGajera/CTX/internal/config"
+	projctx "github.com/AnshGajera/CTX/internal/context"
+	"github.com/AnshGajera/CTX/internal/engine"
+	"github.com/AnshGajera/CTX/internal/versioning"
+	"github.com/AnshGajera/CTX/internal/watcher"
 	"github.com/urfave/cli/v2"
 )
 
@@ -30,7 +31,8 @@ func WatchCommand() *cli.Command {
 			if err != nil {
 				return err
 			}
-			engine := engine.NewExtractionEngine(cwd, &manifest.Profile)
+			cfg, _ := config.Load(config.ProjectConfigPath(cwd))
+			engine := engine.NewExtractionEngine(cwd, &manifest.Profile, cfg.Core.MLURL)
 			store := versioning.NewContextStore(filepath.Join(cwd, ".ctx"))
 			w := watcher.NewWatcher(cwd, engine, store, c.Duration("debounce"))
 			w.SetAutoPush(c.Bool("auto-push"))

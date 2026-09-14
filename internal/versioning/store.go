@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	projctx "github.com/ctxdev/ctx/internal/context"
+	projctx "github.com/AnshGajera/CTX/internal/context"
 )
 
 // ContextSnapshot is one committed context version.
@@ -45,19 +45,57 @@ func (s *ContextStore) headPath() string {
 	return filepath.Join(s.ctxDir, "HEAD")
 }
 
+// CanonicalHash hashes context excluding volatile fields (timestamps), so
+// identical code produces identical hashes across extractions.
+func CanonicalHash(ctx *projctx.ProjectContext) (string, error) {
+	clone := *ctx
+	clone.ExtractedAt = time.Time{}
+	clone.ContentHash = ""
+	data, err := json.Marshal(clone)
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:16]), nil
+}
+
+// autoMessages are messages for which identical content does not create a new snapshot.
+var autoMessages = map[string]bool{
+	"extract": true, "extract (on-commit)": true, "watch: auto-update": true,
+}
+
 // Commit serializes ctx, hashes, saves snapshot, updates HEAD.
-func (s *ContextStore) Commit(ctx *projctx.ProjectContext, message string) (*ContextSnapshot, error) {
+// Returns deduped=true when content is unchanged and the message is automatic;
+// in that case the existing HEAD snapshot is returned and nothing is written.
+func (s *ContextStore) Commit(ctx *projctx.ProjectContext, message string) (snap *ContextSnapshot, deduped bool, err error) {
 	if err := os.MkdirAll(s.snapshotsDir(), 0o755); err != nil {
-		return nil, fmt.Errorf("create snapshots dir: %w", err)
+		return nil, false, fmt.Errorf("create snapshots dir: %w", err)
+	}
+	hash, err := CanonicalHash(ctx)
+	if err != nil {
+		return nil, false, fmt.Errorf("hash context: %w", err)
+	}
+	ctx.ContentHash = hash
+	parent, _ := s.GetHead()
+	if parent != "" && autoMessages[message] {
+		if head, lerr := s.LoadSnapshot(parent); lerr == nil {
+			if oldCtx, derr := SnapshotToContext(head); derr == nil {
+				if oldCtx.ContentHash == "" {
+					// Legacy snapshot: compare canonical hashes directly.
+					if oldHash, herr := CanonicalHash(oldCtx); herr == nil && oldHash == hash {
+						return head, true, nil
+					}
+				} else if oldCtx.ContentHash == hash {
+					return head, true, nil
+				}
+			}
+		}
 	}
 	data, err := json.Marshal(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("marshal context: %w", err)
+		return nil, false, fmt.Errorf("marshal context: %w", err)
 	}
-	sum := sha256.Sum256(data)
-	hash := hex.EncodeToString(sum[:16])
-	parent, _ := s.GetHead()
-	snap := &ContextSnapshot{
+	snap = &ContextSnapshot{
 		Hash:       hash,
 		ParentHash: parent,
 		Timestamp:  time.Now().UTC(),
@@ -71,15 +109,15 @@ func (s *ContextStore) Commit(ctx *projctx.ProjectContext, message string) (*Con
 	}
 	out, err := json.MarshalIndent(snap, "", "  ")
 	if err != nil {
-		return nil, fmt.Errorf("marshal snapshot: %w", err)
+		return nil, false, fmt.Errorf("marshal snapshot: %w", err)
 	}
 	if err := os.WriteFile(filepath.Join(s.snapshotsDir(), hash+".json"), out, 0o644); err != nil {
-		return nil, fmt.Errorf("write snapshot: %w", err)
+		return nil, false, fmt.Errorf("write snapshot: %w", err)
 	}
 	if err := os.WriteFile(s.headPath(), []byte(hash), 0o644); err != nil {
-		return nil, fmt.Errorf("write HEAD: %w", err)
+		return nil, false, fmt.Errorf("write HEAD: %w", err)
 	}
-	return snap, nil
+	return snap, false, nil
 }
 
 // GetHead reads the HEAD file.

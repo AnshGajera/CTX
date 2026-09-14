@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/ctxdev/ctx/internal/mcp"
-	"github.com/ctxdev/ctx/internal/versioning"
+	"github.com/AnshGajera/CTX/internal/mcp"
+	"github.com/AnshGajera/CTX/internal/versioning"
 	"github.com/fatih/color"
 	"github.com/urfave/cli/v2"
 )

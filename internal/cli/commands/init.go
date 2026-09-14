@@ -5,12 +5,12 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/ctxdev/ctx/internal/config"
-	projctx "github.com/ctxdev/ctx/internal/context"
-	"github.com/ctxdev/ctx/internal/detector"
-	"github.com/ctxdev/ctx/internal/engine"
-	"github.com/ctxdev/ctx/internal/privacy"
-	"github.com/ctxdev/ctx/internal/versioning"
+	"github.com/AnshGajera/CTX/internal/config"
+	projctx "github.com/AnshGajera/CTX/internal/context"
+	"github.com/AnshGajera/CTX/internal/detector"
+	"github.com/AnshGajera/CTX/internal/engine"
+	"github.com/AnshGajera/CTX/internal/privacy"
+	"github.com/AnshGajera/CTX/internal/versioning"
 	"github.com/fatih/color"
 	"github.com/urfave/cli/v2"
 )
@@ -168,7 +168,8 @@ func runExtract(root string, quiet, onCommit bool, sections []string) error {
 		return fmt.Errorf("not initialized (run ctx init): %w", err)
 	}
 	_ = manifest
-	eng := engine.NewExtractionEngine(root, &manifest.Profile)
+	cfg, _ := config.Load(config.ProjectConfigPath(root))
+	eng := engine.NewExtractionEngine(root, &manifest.Profile, cfg.Core.MLURL)
 	if !quiet {
 		eng.SetProgress(func(name string) { fmt.Printf("  extracting %s...\n", name) })
 	}
@@ -180,7 +181,6 @@ func runExtract(root string, quiet, onCommit bool, sections []string) error {
 		ctx.ContextID = manifest.ContextID
 	}
 	// sanitize
-	cfg, _ := config.Load(config.ProjectConfigPath(root))
 	san := privacy.NewSanitizer(privacy.SanitizeConfig{
 		RedactValues: cfg.Privacy.RedactValues, HashIdentifiers: cfg.Privacy.HashIdentifiers,
 		ExcludePatterns: cfg.Privacy.ExcludePatterns,
@@ -195,7 +195,7 @@ func runExtract(root string, quiet, onCommit bool, sections []string) error {
 	if onCommit {
 		msg = "extract (on-commit)"
 	}
-	snap, err := store.Commit(ctx, msg)
+	snap, deduped, err := store.Commit(ctx, msg)
 	if err != nil {
 		return err
 	}
@@ -208,7 +208,11 @@ func runExtract(root string, quiet, onCommit bool, sections []string) error {
 		if ctx.Database != nil {
 			nModels = len(ctx.Database.Models)
 		}
-		color.Green("Extracted %d endpoints, %d models → %s", nEP, nModels, snap.Hash)
+		if deduped {
+			color.Cyan("No changes since %s — HEAD unchanged", snap.Hash)
+		} else {
+			color.Green("Extracted %d endpoints, %d models → %s", nEP, nModels, snap.Hash)
+		}
 	}
 	return nil
 }

@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"strings"
 
-	projctx "github.com/ctxdev/ctx/internal/context"
+	projctx "github.com/AnshGajera/CTX/internal/context"
 )
 
 // PrismaExtractor parses schema.prisma.

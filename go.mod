@@ -1,4 +1,4 @@
-module github.com/ctxdev/ctx
+module github.com/AnshGajera/CTX
 
 go 1.22
 

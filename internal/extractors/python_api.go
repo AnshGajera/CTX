@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	projctx "github.com/ctxdev/ctx/internal/context"
+	projctx "github.com/AnshGajera/CTX/internal/context"
 )
 
 // PythonAPIExtractor extracts Flask/FastAPI/Django routes.
@@ -26,10 +26,19 @@ var (
 	reDefLine      = regexp.MustCompile(`^\s*def\s+(\w+)\s*\(`)
 )
 
+// isTestPython skips test files/dirs so fixtures don't pollute routes.
+func isTestPython(rel string) bool {
+	base := filepath.Base(rel)
+	slash := filepathToSlash(rel)
+	return strings.HasPrefix(base, "test_") || strings.HasSuffix(base, "_test.py") ||
+		strings.Contains(slash, "/tests/") || strings.Contains(slash, "/test/") ||
+		strings.HasPrefix(slash, "tests/") || strings.HasPrefix(slash, "test/")
+}
+
 func (e *PythonAPIExtractor) Extract(ctx *projctx.ProjectContext) error {
 	var endpoints []projctx.APIEndpoint
 	_ = e.WalkFiles(func(path, rel string, info os.FileInfo) error {
-		if !strings.HasSuffix(path, ".py") {
+		if !strings.HasSuffix(path, ".py") || isTestPython(rel) {
 			return nil
 		}
 		f, err := os.Open(path)

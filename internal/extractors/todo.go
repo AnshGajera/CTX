@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"regexp"
 
-	projctx "github.com/ctxdev/ctx/internal/context"
+	projctx "github.com/AnshGajera/CTX/internal/context"
 )
 
 // TODOExtractor collects TODO/FIXME/HACK/XXX/BUG comments.

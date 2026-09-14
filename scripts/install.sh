@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO="ctxdev/ctx"
+REPO="AnshGajera/CTX"
 BIN_DIR="${HOME}/.ctx/bin"
 VERSION="${1:-latest}"
 

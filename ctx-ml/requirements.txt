@@ -6,3 +6,5 @@ numpy>=1.26
 sentence-transformers>=2.6
 pytest>=8.0
 httpx>=0.27
+tree-sitter>=0.21
+tree-sitter-typescript>=0.21

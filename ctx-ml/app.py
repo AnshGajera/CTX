@@ -16,6 +16,7 @@ except Exception:  # pragma: no cover - optional dep
 
 from ranker import tfidf_rank
 from chunker import chunk_context
+from ast_extract import extract_routes
 
 app = FastAPI(title="ctx-ml", version="1.0.0")
 
@@ -55,6 +56,10 @@ class SummarizeRequest(BaseModel):
     style: str = "onboarding"
 
 
+class ExtractRoutesRequest(BaseModel):
+    root: str
+
+
 @app.get("/health")
 def health() -> dict[str, Any]:
     return {"status": "ok", "model": _model_name, "loaded": get_model() is not None}
@@ -83,6 +88,16 @@ def search(req: SearchRequest) -> dict[str, Any]:
     # TF-IDF fallback (also used for offline eval parity with Go)
     ranked = tfidf_rank(req.query, [c.model_dump() for c in req.chunks], req.top_k)
     return {"results": ranked, "backend": "tfidf"}
+
+
+@app.post("/extract/routes")
+def extract_routes_ep(req: ExtractRoutesRequest) -> dict[str, Any]:
+    """AST-based route extraction for a local repo root."""
+    import os as _os
+
+    if not _os.path.isdir(req.root):
+        return {"endpoints": [], "error": "not a directory"}
+    return {"endpoints": extract_routes(req.root)}
 
 
 @app.post("/summarize")

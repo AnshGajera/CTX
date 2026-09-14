@@ -1,8 +1,8 @@
 package cli
 
 import (
-	"github.com/ctxdev/ctx/internal/cli/commands"
-	"github.com/ctxdev/ctx/internal/version"
+	"github.com/AnshGajera/CTX/internal/cli/commands"
+	"github.com/AnshGajera/CTX/internal/version"
 	"github.com/urfave/cli/v2"
 )
 
@@ -31,6 +31,7 @@ func NewApp() *cli.App {
 			commands.LoginCommand(),
 			commands.SearchCommand(),
 			commands.EvalCommand(),
+			commands.ExportCommand(),
 		},
 	}
 }

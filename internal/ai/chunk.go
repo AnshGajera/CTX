@@ -3,7 +3,7 @@ package ai
 import (
 	"strings"
 
-	projctx "github.com/ctxdev/ctx/internal/context"
+	projctx "github.com/AnshGajera/CTX/internal/context"
 )
 
 // Chunk is one RAG chunk.
