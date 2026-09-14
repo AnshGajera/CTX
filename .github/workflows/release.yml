@@ -14,14 +14,41 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.22"
-      - name: GoReleaser
-        uses: goreleaser/goreleaser-action@v6
-        with:
-          version: latest
-          args: release --clean
+      - name: Build all platforms
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Upload install script
+          VERSION: ${{ github.ref_name }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          VER="${VERSION#v}"
+          DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          LDFLAGS="-s -w -X github.com/AnshGajera/CTX/internal/version.Version=${VERSION} -X github.com/AnshGajera/CTX/internal/version.Commit=${COMMIT::8} -X github.com/AnshGajera/CTX/internal/version.Date=${DATE}"
+          mkdir -p dist stage
+          build_one() { # $1=goos $2=goarch $3=ext(tar.gz|zip)
+            echo "Building $1/$2..."
+            CGO_ENABLED=0 GOOS="$1" GOARCH="$2" go build -ldflags "$LDFLAGS" -o stage/ctx${4:-} ./cmd/ctx
+            cp README.md LICENSE stage/
+            ARCHIVE="ctx_${VER}_$1_$2.$3"
+            if [ "$3" = "zip" ]; then
+              (cd stage && zip -q "../dist/${ARCHIVE}" ctx${4:-} README.md LICENSE)
+            else
+              tar -czf "dist/${ARCHIVE}" -C stage "ctx${4:-}" README.md LICENSE
+            fi
+            rm -f stage/ctx${4:-}
+          }
+          build_one linux amd64 tar.gz
+          build_one linux arm64 tar.gz
+          build_one darwin amd64 tar.gz
+          build_one darwin arm64 tar.gz
+          build_one windows amd64 zip ".exe"
+          (cd dist && sha256sum * > checksums.txt)
+          ls -la dist
+      - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          files: scripts/install.sh
+          files: |
+            dist/*
+            scripts/install.sh
+            scripts/install.ps1
+          fail_on_unmatched_files: true
+          generate_release_notes: true
