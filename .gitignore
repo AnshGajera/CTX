@@ -1,5 +1,5 @@
-ctx
-ctx.exe
+/ctx
+/ctx.exe
 .ctx/
 dist/
 __pycache__/
