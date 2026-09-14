@@ -22,6 +22,3 @@ archives:
 checksum:
   name_template: checksums.txt
   algorithm: sha256
-release:
-  footer: |
-    Install: `curl -fsSL https://raw.githubusercontent.com/AnshGajera/CTX/main/scripts/install.sh | bash`

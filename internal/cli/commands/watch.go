@@ -32,7 +32,7 @@ func WatchCommand() *cli.Command {
 				return err
 			}
 			cfg, _ := config.Load(config.ProjectConfigPath(cwd))
-			engine := engine.NewExtractionEngine(cwd, &manifest.Profile, cfg.Core.MLURL)
+			engine := engine.NewExtractionEngine(cwd, &manifest.Profile, cfg.Core.MLURL, nil)
 			store := versioning.NewContextStore(filepath.Join(cwd, ".ctx"))
 			w := watcher.NewWatcher(cwd, engine, store, c.Duration("debounce"))
 			w.SetAutoPush(c.Bool("auto-push"))

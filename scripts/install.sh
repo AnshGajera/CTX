@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Installs ctx from GitHub releases. Resolves the exact archive name
+# via the Releases API, so GoReleaser naming changes can't break installs.
 set -euo pipefail
 
 REPO="AnshGajera/CTX"
@@ -23,29 +25,46 @@ detect_arch() {
 
 OS=$(detect_os)
 ARCH=$(detect_arch)
+ALT_ARCH="x86_64"
+[ "$ARCH" = "arm64" ] && ALT_ARCH="aarch64"
 
 if [ "$VERSION" = "latest" ]; then
-  VERSION=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name"' | cut -d'"' -f4)
+  VERSION=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name"' | head -n1 | cut -d'"' -f4)
 fi
+[ -n "$VERSION" ] || { echo "Could not resolve version" >&2; exit 1; }
 echo "Installing ctx ${VERSION} (${OS}/${ARCH})..."
 
-TARBALL="ctx_${VERSION#v}_${OS}_${ARCH}.tar.gz"
-URL="https://github.com/${REPO}/releases/download/${VERSION}/${TARBALL}"
+API_JSON=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/tags/${VERSION}")
+URLS=$(printf '%s' "$API_JSON" | grep -o '"browser_download_url": *"[^"]*"' | cut -d'"' -f4)
+
+pick() { # $1=os-pattern $2=arch-pattern $3=ext-pattern
+  printf '%s\n' "$URLS" | grep -i "$1" | grep -Ei "$2" | grep -i "$3" | head -n1
+}
+
+TARBALL_URL=$(pick "$OS" "${ARCH}|${ALT_ARCH}" 'tar\.gz$')
+if [ -z "$TARBALL_URL" ]; then
+  echo "No ${OS}/${ARCH} archive found in ${VERSION}" >&2
+  printf '%s\n' "$URLS" >&2
+  exit 1
+fi
+SUM_URL=$(pick "checksum" "" 'txt$')
 
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 cd "$TMP"
-curl -fsSL -o "$TARBALL" "$URL"
-curl -fsSL -o checksums.txt "https://github.com/${REPO}/releases/download/${VERSION}/checksums.txt"
-
-if command -v sha256sum >/dev/null; then
-  grep "$TARBALL" checksums.txt | sha256sum -c -
-elif command -v shasum >/dev/null; then
-  grep "$TARBALL" checksums.txt | shasum -a 256 -c -
+ARCHIVE_NAME=$(basename "$TARBALL_URL")
+curl -fsSL -o "$ARCHIVE_NAME" "$TARBALL_URL"
+if [ -n "$SUM_URL" ]; then
+  curl -fsSL -o checksums.txt "$SUM_URL"
+  if command -v sha256sum >/dev/null; then
+    grep "$ARCHIVE_NAME" checksums.txt | sha256sum -c -
+  elif command -v shasum >/dev/null; then
+    grep "$ARCHIVE_NAME" checksums.txt | shasum -a 256 -c -
+  fi
 fi
 
 mkdir -p "$BIN_DIR"
-tar -xzf "$TARBALL" -C "$BIN_DIR"
+tar -xzf "$ARCHIVE_NAME" -C "$BIN_DIR"
 chmod +x "$BIN_DIR/ctx"
 
 # PATH setup

@@ -18,6 +18,7 @@ func SearchCommand() *cli.Command {
 		Usage: "Semantic search over project context",
 		Flags: []cli.Flag{
 			&cli.IntFlag{Name: "top", Value: 5, Usage: "top K results"},
+			jsonFlag(),
 		},
 		Action: func(c *cli.Context) error {
 			if c.NArg() == 0 {
@@ -53,6 +54,7 @@ func EvalCommand() *cli.Command {
 		Usage: "Evaluate retrieval quality (hit@k)",
 		Flags: []cli.Flag{
 			&cli.IntFlag{Name: "k", Value: 5, Usage: "hit@k"},
+			jsonFlag(),
 		},
 		Action: func(c *cli.Context) error {
 			cwd, _ := os.Getwd()
@@ -99,6 +101,11 @@ func EvalCommand() *cli.Command {
 				}
 			}
 			score := float64(hits) / float64(len(cases))
+			if c.Bool("json") {
+				return json.NewEncoder(os.Stdout).Encode(map[string]any{
+					"k": k, "hit_at_k": score, "hits": hits, "total": len(cases),
+				})
+			}
 			fmt.Printf("hit@%d: %.2f (%d/%d)\n", k, score, hits, len(cases))
 			return nil
 		},

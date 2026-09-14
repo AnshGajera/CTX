@@ -19,6 +19,9 @@ func StatusCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "status",
 		Usage: "Show context status",
+		Flags: []cli.Flag{
+			jsonFlag(),
+		},
 		Action: func(c *cli.Context) error {
 			cwd, _ := os.Getwd()
 			ctxDir := filepath.Join(cwd, ".ctx")

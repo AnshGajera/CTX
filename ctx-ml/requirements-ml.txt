@@ -1,0 +1,5 @@
+# Full ML stack: base + MiniLM embeddings (~2GB torch download).
+# Only needed for /search embedding backend; TF-IDF fallback works without it.
+-r requirements-base.txt
+numpy>=1.26
+sentence-transformers>=2.6

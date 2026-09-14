@@ -2,6 +2,7 @@ package extractors
 
 import (
 	"os/exec"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -93,13 +94,13 @@ func activeAreas(files []string) []string {
 	for k, v := range counts {
 		kvs = append(kvs, kv{k, v})
 	}
-	for i := 0; i < len(kvs); i++ {
-		for j := i + 1; j < len(kvs); j++ {
-			if kvs[j].v > kvs[i].v {
-				kvs[i], kvs[j] = kvs[j], kvs[i]
-			}
+	// Deterministic: count desc, then name asc (map order is random).
+	sort.Slice(kvs, func(i, j int) bool {
+		if kvs[i].v != kvs[j].v {
+			return kvs[i].v > kvs[j].v
 		}
-	}
+		return kvs[i].k < kvs[j].k
+	})
 	var out []string
 	for i, kv := range kvs {
 		if i >= 5 {

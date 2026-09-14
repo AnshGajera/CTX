@@ -1,6 +1,7 @@
 <#
 .SYNOPSIS
-  Installs ctx on Windows (PowerShell 5.1+).
+  Installs ctx on Windows (PowerShell 5.1+). Resolves the exact asset
+  name via the GitHub Releases API.
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File install.ps1
   powershell -ExecutionPolicy Bypass -File install.ps1 -Version v0.1.0
@@ -12,42 +13,52 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$arch = switch ($env:PROCESSOR_ARCHITECTURE) {
-  "AMD64" { "amd64" }
-  "ARM64" { "arm64" }
-  default { throw "Unsupported architecture: $env:PROCESSOR_ARCHITECTURE" }
-}
+$cpu = $env:PROCESSOR_ARCHITECTURE
+$archPatterns = if ($cpu -eq "ARM64") { @("arm64", "aarch64") } else { @("amd64", "x86_64") }
 
 if ($Version -eq "latest") {
-  $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest"
-  $Version = $release.tag_name
+  $Version = (Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest").tag_name
 }
-Write-Host "Installing ctx $Version (windows/$arch)..."
+Write-Host "Installing ctx $Version (windows/$cpu)..."
 
-$asset = "ctx_${($Version -replace '^v','')}_windows_${arch}.zip"
-if ($arch -eq "arm64") {
-  # No windows/arm64 build published; fall back to amd64 under emulation.
-  Write-Warning "No windows/arm64 asset published; using amd64 (runs via emulation)."
-  $arch = "amd64"
-  $asset = "ctx_${($Version -replace '^v','')}_windows_amd64.zip"
+$rel = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/tags/$Version"
+$asset = $rel.assets | Where-Object {
+  $_.name -match 'windows' -and $_.name -match ($archPatterns -join '|') -and $_.name -match '\.(zip|tar\.gz)$'
+} | Select-Object -First 1
+if (-not $asset) {
+  Write-Error "No windows/$cpu asset in $Version. Available:`n$($rel.assets.name -join "`n")"
+  exit 1
 }
-$base = "https://github.com/$Repo/releases/download/$Version"
+$checksums = $rel.assets | Where-Object { $_.name -match 'checksum' } | Select-Object -First 1
+Write-Host "Asset: $($asset.name)"
 
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ("ctx-install-" + [Guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Path $tmp | Out-Null
 try {
-  Invoke-WebRequest -Uri "$base/$asset" -OutFile (Join-Path $tmp $asset)
-  Invoke-WebRequest -Uri "$base/checksums.txt" -OutFile (Join-Path $tmp "checksums.txt")
+  $archive = Join-Path $tmp $asset.name
+  Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $archive
 
-  $expected = (Select-String -Path (Join-Path $tmp "checksums.txt") -Pattern $asset | ForEach-Object { $_.Line.Split()[0] })
-  $actual = (Get-FileHash -Path (Join-Path $tmp $asset) -Algorithm SHA256).Hash.ToLower()
-  if ($expected -and ($expected.ToLower() -ne $actual)) {
-    throw "Checksum mismatch for $asset. Expected $expected, got $actual."
+  if ($checksums) {
+    $sumFile = Join-Path $tmp $checksums.name
+    Invoke-WebRequest -Uri $checksums.browser_download_url -OutFile $sumFile
+    $line = Select-String -Path $sumFile -Pattern ([regex]::Escape($asset.name)) | Select-Object -First 1
+    if ($line) {
+      $expected = ($line.Line -split '\s+')[0].ToLower()
+      $actual = (Get-FileHash -Path $archive -Algorithm SHA256).Hash.ToLower()
+      if ($expected -ne $actual) {
+        throw "Checksum mismatch for $($asset.name). Expected $expected, got $actual."
+      }
+      Write-Host "Checksum OK."
+    }
   }
 
   $binDir = Join-Path $HOME ".ctx\bin"
   New-Item -ItemType Directory -Force -Path $binDir | Out-Null
-  Expand-Archive -Path (Join-Path $tmp $asset) -DestinationPath $binDir -Force
+  if ($archive -match '\.zip$') {
+    Expand-Archive -Path $archive -DestinationPath $binDir -Force
+  } else {
+    tar -xzf $archive -C $binDir
+  }
 
   $path = [Environment]::GetEnvironmentVariable("Path", "User")
   if ($path -notlike "*$binDir*") {

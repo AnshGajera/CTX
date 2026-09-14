@@ -41,14 +41,15 @@ ctx serve --stdio            # Cursor / Claude Desktop
 | `ctx watch` | File watcher with debounce |
 | `ctx push/pull/share/login` | [preview] Cloud sync — needs ctx backend; local-first otherwise |
 
-## MCP integration
+## MCP integration (stdio-first)
 
-Cursor: add `http://localhost:3100/mcp` as MCP server.
-Claude Desktop (`claude_desktop_config.json`):
+**Recommended: stdio** — full MCP protocol (JSON-RPC), works with Cursor, Claude Desktop, and any MCP client:
 
 ```json
 {"mcpServers": {"ctx": {"command": "ctx", "args": ["serve", "--stdio"]}}}
 ```
+
+**HTTP mode** (`ctx serve --port 3100`) is a plain REST API for scripts and debugging (`/context`, `/context/apis`, `/mcp/tools/*`) — it is *not* the MCP Streamable HTTP protocol, so point MCP clients at stdio.
 
 Tools: `get_project_context` (supports `sections`, `max_tokens`), `get_context_for_task`, `get_context_for_file`, `get_api_endpoints`, `get_database_schema`, `get_project_conventions`, `get_env_requirements`, `search_context`.
 
@@ -67,13 +68,14 @@ Tip: `GET /context?max_tokens=4000` returns budget-truncated context (least-impo
 ## ML sidecar (`ctx-ml/`)
 
 ```bash
-pip install -r ctx-ml/requirements.txt
+pip install -r ctx-ml/requirements.txt          # base: server + AST + tests (no torch)
+pip install -r ctx-ml/requirements-ml.txt       # optional: MiniLM embeddings (~2GB)
 uvicorn ctx-ml.app:app --port 8001
 # or: docker compose up ctx-ml
 python ctx-ml/eval.py .ctx/context.json 5
 ```
 
-Uses `sentence-transformers/all-MiniLM-L6-v2` when available, TF-IDF fallback otherwise (Go and Python rankers are parity-tested). `ctx extract` auto-merges sidecar AST routes when the sidecar is reachable; offline it silently falls back to regex extractors.
+Uses `sentence-transformers/all-MiniLM-L6-v2` when installed, TF-IDF fallback otherwise (Go and Python rankers are parity-tested). `ctx extract` auto-merges sidecar AST routes when the sidecar is reachable; offline it silently falls back to regex extractors.
 
 ## Privacy
 

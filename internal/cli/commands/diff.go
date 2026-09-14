@@ -16,6 +16,9 @@ func DiffCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "diff",
 		Usage: "Diff two snapshots (default HEAD~1 HEAD)",
+		Flags: []cli.Flag{
+			jsonFlag(),
+		},
 		Action: func(c *cli.Context) error {
 			cwd, _ := os.Getwd()
 			store := versioning.NewContextStore(filepath.Join(cwd, ".ctx"))
@@ -85,6 +88,7 @@ func LogCommand() *cli.Command {
 		Usage: "Show snapshot history",
 		Flags: []cli.Flag{
 			&cli.IntFlag{Name: "limit", Value: 10, Usage: "max entries"},
+			jsonFlag(),
 		},
 		Action: func(c *cli.Context) error {
 			cwd, _ := os.Getwd()

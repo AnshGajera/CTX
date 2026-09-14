@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"encoding/json"
 	"os"
 
 	"github.com/urfave/cli/v2"
@@ -14,14 +15,27 @@ func ExtractCommand() *cli.Command {
 		Flags: []cli.Flag{
 			&cli.BoolFlag{Name: "quiet", Usage: "suppress output"},
 			&cli.BoolFlag{Name: "on-commit", Usage: "mark extraction as on-commit"},
-			&cli.StringSliceFlag{Name: "sections", Usage: "limit sections"},
+			&cli.StringSliceFlag{Name: "sections", Usage: "limit sections (repeatable)"},
+			jsonFlag(),
 		},
 		Action: func(c *cli.Context) error {
 			cwd, err := os.Getwd()
 			if err != nil {
 				return err
 			}
-			return runExtract(cwd, c.Bool("quiet"), c.Bool("on-commit"), c.StringSlice("sections"))
+			jsonMode := c.Bool("json")
+			deduped, err := runExtract(cwd, c.Bool("quiet") || jsonMode, c.Bool("on-commit"), c.StringSlice("sections"))
+			if err != nil {
+				return err
+			}
+			if jsonMode {
+				summary, err := extractSummary(cwd, deduped)
+				if err != nil {
+					return err
+				}
+				return json.NewEncoder(os.Stdout).Encode(summary)
+			}
+			return nil
 		},
 	}
 }

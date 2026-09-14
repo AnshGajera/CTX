@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -19,20 +20,53 @@ type ExtractionEngine struct {
 	profile    *projctx.ProjectProfile
 	extractors []extractors.Extractor
 	onProgress func(name string)
+	sections   map[string]bool // nil = all sections enabled
+}
+
+// Section names for --sections / config gating.
+const (
+	SectionArchitecture = "architecture"
+	SectionAPIEndpoints = "api_endpoints"
+	SectionDatabase     = "database_schema"
+	SectionDependencies = "dependencies"
+	SectionBusiness     = "business_rules"
+	SectionEnvVars      = "env_vars"
+)
+
+// SetSections limits extraction to named sections (empty = all).
+// Names are normalized: case-insensitive, "-" and "_" equivalent.
+func (e *ExtractionEngine) SetSections(sections []string) {
+	if len(sections) == 0 {
+		e.sections = nil
+		return
+	}
+	e.sections = map[string]bool{}
+	for _, s := range sections {
+		e.sections[normalizeSectionName(s)] = true
+	}
+}
+
+func normalizeSectionName(s string) string {
+	return strings.ReplaceAll(strings.ToLower(strings.TrimSpace(s)), "-", "_")
+}
+
+func (e *ExtractionEngine) sectionOn(name string) bool {
+	if e.sections == nil {
+		return true
+	}
+	return e.sections[normalizeSectionName(name)]
 }
 
 // NewExtractionEngine registers extractors based on profile.
 // mlURL enables the sidecar AST extractor ("" disables it).
-func NewExtractionEngine(root string, profile *projctx.ProjectProfile, mlURL string) *ExtractionEngine {
+func NewExtractionEngine(root string, profile *projctx.ProjectProfile, mlURL string, sections []string) *ExtractionEngine {
 	e := &ExtractionEngine{root: root, profile: profile}
-	// Always-on
+	e.SetSections(sections)
+	// Always-on foundation + state
 	e.extractors = append(e.extractors,
 		extractors.NewFileStructure(root),
-		extractors.NewDependencies(root),
-		extractors.NewEnvironment(root),
 		extractors.NewGitState(root),
 		extractors.NewTODO(root),
-		extractors.NewPatterns(root),
 	)
 	langs := map[string]bool{}
 	fws := map[string]bool{}
@@ -44,76 +78,83 @@ func NewExtractionEngine(root string, profile *projctx.ProjectProfile, mlURL str
 			fws[strings.ToLower(f.Name)] = true
 		}
 	}
-	hasTS := langs["typescript"] || langs["javascript"]
-	if hasTS {
-		e.extractors = append(e.extractors, extractors.NewTypeScriptAPI(root))
+	if e.sectionOn(SectionArchitecture) {
+		e.extractors = append(e.extractors, extractors.NewArchitecture(root))
+		e.extractors = append(e.extractors, extractors.NewPatterns(root))
 	}
-	if fws["next.js"] || fws["next"] {
-		e.extractors = append(e.extractors, extractors.NewNextJS(root))
+	if e.sectionOn(SectionDependencies) {
+		e.extractors = append(e.extractors, extractors.NewDependencies(root))
 	}
-	if fws["express"] || fws["fastify"] || fws["hono"] {
-		e.extractors = append(e.extractors, extractors.NewExpressAPI(root))
+	if e.sectionOn(SectionEnvVars) {
+		e.extractors = append(e.extractors, extractors.NewEnvironment(root))
 	}
-	if langs["go"] {
-		e.extractors = append(e.extractors, extractors.NewGoAPI(root))
+	if e.sectionOn(SectionAPIEndpoints) {
+		hasTS := langs["typescript"] || langs["javascript"]
+		if hasTS {
+			e.extractors = append(e.extractors, extractors.NewTypeScriptAPI(root))
+		}
+		if fws["next.js"] || fws["next"] {
+			e.extractors = append(e.extractors, extractors.NewNextJS(root))
+		}
+		if fws["express"] || fws["fastify"] || fws["hono"] {
+			e.extractors = append(e.extractors, extractors.NewExpressAPI(root))
+		}
+		if langs["go"] {
+			e.extractors = append(e.extractors, extractors.NewGoAPI(root))
+		}
+		if langs["python"] {
+			e.extractors = append(e.extractors, extractors.NewPythonAPI(root))
+		}
+		// AST precision pass: merges only endpoints regex missed.
+		e.extractors = append(e.extractors, extractors.NewSidecarAST(root, mlURL))
 	}
-	if langs["python"] {
-		e.extractors = append(e.extractors, extractors.NewPythonAPI(root))
+	if e.sectionOn(SectionDatabase) {
+		e.extractors = append(e.extractors, extractors.NewPrisma(root))
+		e.extractors = append(e.extractors, extractors.NewGenericModels(root))
 	}
-	e.extractors = append(e.extractors, extractors.NewPrisma(root))
-	e.extractors = append(e.extractors, extractors.NewGenericModels(root))
-	// AST precision pass last: merges only endpoints regex missed.
-	e.extractors = append(e.extractors, extractors.NewSidecarAST(root, mlURL))
+	// Business rules ride on patterns for now (enriched later).
 	return e
 }
 
 // SetProgress sets an optional progress callback.
 func (e *ExtractionEngine) SetProgress(fn func(name string)) { e.onProgress = fn }
 
-// Extract runs all extractors and returns the context.
+// Extract runs all extractors truly in parallel — each gets a private
+// partial context — then merges in registration order with global
+// dedupe, sorts deterministically, and hashes.
 func (e *ExtractionEngine) Extract() (*projctx.ProjectContext, error) {
 	name := filepath.Base(e.root)
 	profile := projctx.ProjectProfile{}
 	if e.profile != nil {
 		profile = *e.profile
 	}
+	partials := make([]*projctx.ProjectContext, len(e.extractors))
+	errs := make([]string, len(e.extractors))
+	var wg sync.WaitGroup
+	for i, ex := range e.extractors {
+		wg.Add(1)
+		go func(i int, ex extractors.Extractor) {
+			defer wg.Done()
+			if e.onProgress != nil {
+				e.onProgress(ex.Name())
+			}
+			partial := &projctx.ProjectContext{Profile: profile}
+			if err := ex.Extract(partial); err != nil {
+				errs[i] = ex.Name() + ": " + err.Error()
+			}
+			partials[i] = partial
+		}(i, ex)
+	}
+	wg.Wait()
 	ctx := &projctx.ProjectContext{
 		Version:     1,
 		ProjectName: name,
 		ExtractedAt: time.Now().UTC(),
 		Profile:     profile,
 	}
-	var mu sync.Mutex
-	var wg sync.WaitGroup
-	errs := make([]string, 0)
-	for _, ex := range e.extractors {
-		wg.Add(1)
-		go func(ex extractors.Extractor) {
-			defer wg.Done()
-			if e.onProgress != nil {
-				e.onProgress(ex.Name())
-			}
-			mu.Lock()
-			defer mu.Unlock()
-			if err := ex.Extract(ctx); err != nil {
-				errs = append(errs, ex.Name()+": "+err.Error())
-			}
-		}(ex)
-	}
-	wg.Wait()
-	// fixup: TODO extractor may run before GitState creates CurrentState;
-	// both handle nil, but ensure TODOs survive regardless of order by
-	// re-running TODO last if state was overwritten — instead we merge:
-	// (extractors already nil-guard, last writer wins only for CurrentState
-	//  struct creation; TODOs could be lost if GitState ran after TODO).
-	// Re-collect TODOs deterministically if missing.
-	if ctx.CurrentState != nil && len(ctx.CurrentState.TODOs) == 0 {
-		mu.Lock()
-		_ = extractors.NewTODO(e.root).Extract(ctx)
-		mu.Unlock()
-	}
-	// Deterministic ordering: extractors run concurrently and Go map
-	// iteration is random, so sort everything before hashing. Without
+	mergePartials(ctx, partials)
+	// Deterministic ordering: extractor output order and Go map
+	// iteration are random, so sort everything before hashing. Without
 	// this, identical code produces different hashes on every run.
 	sortContext(ctx)
 	hash, err := versioning.CanonicalHash(ctx)
@@ -123,6 +164,205 @@ func (e *ExtractionEngine) Extract() (*projctx.ProjectContext, error) {
 	ctx.ContentHash = hash
 	_ = errs
 	return ctx, nil
+}
+
+// mergePartials combines per-extractor partials in order with global
+// dedupe (first writer wins), so overlapping extractors — TS regex vs
+// Next.js vs sidecar AST — never duplicate endpoints or models.
+func mergePartials(dst *projctx.ProjectContext, partials []*projctx.ProjectContext) {
+	epSeen := map[string]bool{}
+	modelSeen := map[string]bool{}
+	relSeen := map[string]bool{}
+	migSeen := map[string]bool{}
+	depSeen := map[string]bool{}
+	envSeen := map[string]bool{}
+	ruleSeen := map[string]bool{}
+	patSeen := map[string]*projctx.CodePattern{}
+	todoSeen := map[string]bool{}
+	reqSeen := map[string]bool{}
+	profSeen := map[string]bool{}
+	for _, p := range partials {
+		if p == nil {
+			continue
+		}
+		if p.APIs != nil {
+			if dst.APIs == nil {
+				dst.APIs = &projctx.APIContext{}
+			}
+			for _, ep := range p.APIs.Endpoints {
+				key := strings.ToUpper(ep.Method) + " " + ep.Path
+				if epSeen[key] {
+					continue
+				}
+				epSeen[key] = true
+				dst.APIs.Endpoints = append(dst.APIs.Endpoints, ep)
+			}
+			if dst.APIs.AuthType == "" {
+				dst.APIs.AuthType = p.APIs.AuthType
+			}
+			if dst.APIs.BaseURL == "" {
+				dst.APIs.BaseURL = p.APIs.BaseURL
+			}
+			if dst.APIs.Version == "" {
+				dst.APIs.Version = p.APIs.Version
+			}
+		}
+		if p.Database != nil {
+			if dst.Database == nil {
+				dst.Database = &projctx.DatabaseContext{}
+			}
+			d, s := dst.Database, p.Database
+			for _, m := range s.Models {
+				if modelSeen[m.Name] {
+					continue
+				}
+				modelSeen[m.Name] = true
+				d.Models = append(d.Models, m)
+			}
+			for _, r := range s.Relations {
+				key := r.From + ">" + r.To + "#" + r.FieldName
+				if relSeen[key] {
+					continue
+				}
+				relSeen[key] = true
+				d.Relations = append(d.Relations, r)
+			}
+			for _, m := range s.Migrations {
+				if migSeen[m.File] {
+					continue
+				}
+				migSeen[m.File] = true
+				d.Migrations = append(d.Migrations, m)
+			}
+			if d.ORM == "" {
+				d.ORM = s.ORM
+			}
+			if d.Type == "" {
+				d.Type = s.Type
+			}
+			if d.Diagram == "" {
+				d.Diagram = s.Diagram
+			}
+		}
+		if p.Dependencies != nil {
+			if dst.Dependencies == nil {
+				dst.Dependencies = &projctx.DependencyContext{}
+			}
+			for _, dep := range append(append([]projctx.Dependency{}, p.Dependencies.Direct...), p.Dependencies.Dev...) {
+				if depSeen[dep.Name] {
+					continue
+				}
+				depSeen[dep.Name] = true
+				dst.Dependencies.Direct = append(dst.Dependencies.Direct, dep)
+			}
+			dst.Dependencies.Internal = append(dst.Dependencies.Internal, p.Dependencies.Internal...)
+		}
+		if p.Environment != nil {
+			if dst.Environment == nil {
+				dst.Environment = &projctx.EnvironmentContext{}
+			}
+			for _, v := range p.Environment.Variables {
+				if envSeen[v.Name] {
+					continue
+				}
+				envSeen[v.Name] = true
+				dst.Environment.Variables = append(dst.Environment.Variables, v)
+			}
+			for _, r := range p.Environment.Required {
+				if !reqSeen[r] {
+					reqSeen[r] = true
+					dst.Environment.Required = append(dst.Environment.Required, r)
+				}
+			}
+			for _, pr := range p.Environment.Profiles {
+				if !profSeen[pr] {
+					profSeen[pr] = true
+					dst.Environment.Profiles = append(dst.Environment.Profiles, pr)
+				}
+			}
+		}
+		if p.FileStructure != nil && dst.FileStructure == nil {
+			dst.FileStructure = p.FileStructure
+		}
+		if p.Architecture != nil && dst.Architecture == nil {
+			dst.Architecture = p.Architecture
+		}
+		if p.BusinessRules != nil {
+			if dst.BusinessRules == nil {
+				dst.BusinessRules = &projctx.BusinessRuleContext{}
+			}
+			for _, r := range p.BusinessRules.Rules {
+				if ruleSeen[r.ID] {
+					continue
+				}
+				ruleSeen[r.ID] = true
+				dst.BusinessRules.Rules = append(dst.BusinessRules.Rules, r)
+			}
+		}
+		if p.Decisions != nil {
+			if dst.Decisions == nil {
+				dst.Decisions = &projctx.DecisionContext{}
+			}
+			dst.Decisions.Decisions = append(dst.Decisions.Decisions, p.Decisions.Decisions...)
+		}
+		if p.Patterns != nil {
+			if dst.Patterns == nil {
+				dst.Patterns = &projctx.PatternContext{}
+			}
+			for _, cp := range p.Patterns.Patterns {
+				if existing, ok := patSeen[cp.Name]; ok {
+					for _, ex := range cp.Examples {
+						if len(existing.Examples) >= 5 {
+							break
+						}
+						dup := false
+						for _, o := range existing.Examples {
+							if o == ex {
+								dup = true
+								break
+							}
+						}
+						if !dup {
+							existing.Examples = append(existing.Examples, ex)
+						}
+					}
+					existing.Frequency += cp.Frequency
+					continue
+				}
+				cpy := cp
+				dst.Patterns.Patterns = append(dst.Patterns.Patterns, cpy)
+				patSeen[cp.Name] = &dst.Patterns.Patterns[len(dst.Patterns.Patterns)-1]
+			}
+		}
+		if p.CurrentState != nil {
+			if dst.CurrentState == nil {
+				dst.CurrentState = &projctx.ProjectStateContext{}
+			}
+			d, s := dst.CurrentState, p.CurrentState
+			if d.GitBranch == "" {
+				d.GitBranch = s.GitBranch
+			}
+			if d.LastCommit == "" {
+				d.LastCommit = s.LastCommit
+			}
+			if d.LastCommitMsg == "" {
+				d.LastCommitMsg = s.LastCommitMsg
+			}
+			if d.DirtyFiles == 0 {
+				d.DirtyFiles = s.DirtyFiles
+			}
+			d.RecentlyChanged = append(d.RecentlyChanged, s.RecentlyChanged...)
+			d.ActiveAreas = append(d.ActiveAreas, s.ActiveAreas...)
+			for _, td := range s.TODOs {
+				key := td.File + ":" + strconv.Itoa(td.Line) + ":" + td.Text
+				if todoSeen[key] {
+					continue
+				}
+				todoSeen[key] = true
+				d.TODOs = append(d.TODOs, td)
+			}
+		}
+	}
 }
 
 // sortContext orders all list fields deterministically.
