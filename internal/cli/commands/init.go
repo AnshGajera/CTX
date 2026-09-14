@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -14,6 +15,8 @@ import (
 	"github.com/AnshGajera/CTX/internal/engine"
 	"github.com/AnshGajera/CTX/internal/extractors"
 	"github.com/AnshGajera/CTX/internal/privacy"
+	"github.com/AnshGajera/CTX/internal/setup"
+	"github.com/AnshGajera/CTX/internal/tui"
 	"github.com/AnshGajera/CTX/internal/versioning"
 	"github.com/fatih/color"
 	"github.com/urfave/cli/v2"
@@ -59,6 +62,9 @@ func InitCommand() *cli.Command {
 			&cli.StringFlag{Name: "name", Usage: "project name"},
 			&cli.BoolFlag{Name: "auto-extract", Value: true, Usage: "run extraction after init"},
 			&cli.BoolFlag{Name: "install-hooks", Value: true, Usage: "install git hooks"},
+			&cli.BoolFlag{Name: "yes", Aliases: []string{"y"}, Usage: "non-interactive: accept defaults, skip wizard"},
+			&cli.StringFlag{Name: "editor", Usage: "MCP editor setup: cursor|claude-desktop|vscode|none"},
+			&cli.StringSliceFlag{Name: "sections", Usage: "limit sections (repeatable)"},
 			jsonFlag(),
 		},
 		Action: func(c *cli.Context) error {
@@ -66,17 +72,44 @@ func InitCommand() *cli.Command {
 			if err != nil {
 				return err
 			}
-			name := c.String("name")
-			if name == "" {
-				name = filepath.Base(cwd)
-			}
 			jsonMode := c.Bool("json")
+			interactive := !jsonMode && !c.Bool("yes") && tui.IsTerminal(os.Stdin)
+			reader := bufio.NewReader(os.Stdin)
 			if !jsonMode {
+				tui.PrintBanner()
 				color.Cyan("Detecting project...")
 			}
 			profile, err := detector.New(cwd).Detect()
 			if err != nil {
 				return err
+			}
+			name := c.String("name")
+			if name == "" {
+				name = filepath.Base(cwd)
+			}
+			sections := c.StringSlice("sections")
+			editor := c.String("editor")
+			if interactive {
+				if c.String("name") == "" {
+					name = tui.PromptLine(reader, os.Stdout, "Project name", name)
+				}
+				if len(sections) == 0 {
+					sections = tui.PromptSections(reader, os.Stdout, tui.DefaultSections())
+				}
+				if editor == "" {
+					editor = tui.PromptEditor(reader, os.Stdout)
+				}
+			}
+			if editor != "" && editor != "none" {
+				valid := false
+				for _, e := range setup.SupportedEditors() {
+					if editor == e {
+						valid = true
+					}
+				}
+				if !valid {
+					return fmt.Errorf("unknown editor %q (choose from: cursor, claude-desktop, vscode, none)", editor)
+				}
 			}
 			if !jsonMode {
 				fmt.Printf("Languages: ")
@@ -121,11 +154,20 @@ func InitCommand() *cli.Command {
 				_ = config.WriteDefault(cfgPath)
 			}
 			if c.Bool("install-hooks") {
-				installPostCommitHook(cwd)
+				installPostCommitHook(cwd, !jsonMode)
 			}
 			appendGitignore(cwd)
+			if editor != "" && editor != "none" {
+				path, err := setup.Install(editor, cwd)
+				if err != nil {
+					color.Yellow("Editor setup skipped: %v", err)
+				} else if !jsonMode {
+					color.Green("MCP configured for %s → %s", editor, path)
+					fmt.Println("Restart your editor, then ask it to use the ctx tools (try: search_context).")
+				}
+			}
 			if c.Bool("auto-extract") {
-				_, err := runExtract(cwd, c.Bool("json"), false, nil)
+				_, err := runExtract(cwd, c.Bool("json"), false, sections)
 				if err != nil {
 					return err
 				}
@@ -144,7 +186,7 @@ func InitCommand() *cli.Command {
 	}
 }
 
-func installPostCommitHook(root string) {
+func installPostCommitHook(root string, verbose bool) {
 	hookDir := filepath.Join(root, ".git", "hooks")
 	if _, err := os.Stat(hookDir); err != nil {
 		return
@@ -152,7 +194,9 @@ func installPostCommitHook(root string) {
 	hook := filepath.Join(hookDir, "post-commit")
 	content := "#!/bin/sh\nctx extract --quiet --on-commit &\n"
 	_ = os.WriteFile(hook, []byte(content), 0o755)
-	fmt.Println("Installed post-commit hook")
+	if verbose {
+		fmt.Println("Installed post-commit hook")
+	}
 }
 
 func appendGitignore(root string) {

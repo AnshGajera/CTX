@@ -45,22 +45,29 @@ func (e *GoAPIExtractor) Extract(ctx *projctx.ProjectContext) error {
 		for sc.Scan() {
 			lineNo++
 			line := sc.Text()
-			if m := reMuxHandle.FindStringSubmatch(line); len(m) >= 3 {
+			// A line may hold several registrations; match all.
+			for _, m := range reMuxHandle.FindAllStringSubmatch(line, -1) {
+				if len(m) < 3 {
+					continue
+				}
 				method := "ALL"
 				if len(m) >= 4 && m[3] != "" {
 					method = m[3]
 				}
 				endpoints = append(endpoints, projctx.APIEndpoint{Method: method, Path: m[1], Handler: m[2], File: filepath.ToSlash(rel), Line: lineNo, Parameters: pathParams(m[1])})
-				continue
 			}
-			if m := reHandleFunc.FindStringSubmatch(line); len(m) == 3 {
+			for _, m := range reHandleFunc.FindAllStringSubmatch(line, -1) {
+				if len(m) != 3 {
+					continue
+				}
 				endpoints = append(endpoints, projctx.APIEndpoint{Method: "ALL", Path: m[1], Handler: m[2], File: filepath.ToSlash(rel), Line: lineNo, Parameters: pathParams(m[1])})
-				continue
 			}
 			for _, re := range []*regexp.Regexp{reChiRoute, reGinRoute, reEchoRoute, reFiberRoute} {
-				if m := re.FindStringSubmatch(line); len(m) == 4 {
+				for _, m := range re.FindAllStringSubmatch(line, -1) {
+					if len(m) != 4 {
+						continue
+					}
 					endpoints = append(endpoints, projctx.APIEndpoint{Method: strings.ToUpper(m[1]), Path: m[2], Handler: m[3], File: filepath.ToSlash(rel), Line: lineNo, Parameters: pathParams(m[2])})
-					break
 				}
 			}
 		}

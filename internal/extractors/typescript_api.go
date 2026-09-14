@@ -20,9 +20,9 @@ func NewTypeScriptAPI(root string) *TypeScriptAPIExtractor {
 func (e *TypeScriptAPIExtractor) Name() string { return "typescript-api" }
 
 var (
-	reExpressRoute = regexp.MustCompile("(?:app|router)\\.(get|post|put|patch|delete|all)\\(\\s*['\"`]([^'\"`]+)['\"`]")
+	reExpressRoute = regexp.MustCompile("(?:app|router|api|server|r)\\.(get|post|put|patch|delete|all)\\(\\s*['\"`]([^'\"`]+)['\"`]")
 	reChainedRoute = regexp.MustCompile("\\.route\\(\\s*['\"`]([^'\"`]+)['\"`]\\s*\\)\\.(get|post|put|patch|delete)")
-	reHandlerArg   = regexp.MustCompile("(?:app|router)\\.(?:get|post|put|patch|delete|all)\\(\\s*['\"`][^'\"`]+['\"`]\\s*,([^)]*)\\)")
+	reHandlerArg   = regexp.MustCompile("(?:app|router|api|server|r)\\.(?:get|post|put|patch|delete|all)\\(\\s*['\"`][^'\"`]+['\"`]\\s*,([^)]*)\\)")
 	reAuthMw       = regexp.MustCompile(`(?i)\b(auth|authenticate|requireAuth|isAuthenticated|protect|guard|verifyToken|checkAuth)\b`)
 	reValidateMw   = regexp.MustCompile(`(?i)\b(validate|validator|validation|schema)\b`)
 	rePathParam    = regexp.MustCompile(`:([A-Za-z0-9_]+)|\[([A-Za-z0-9_]+)\]`)
@@ -49,7 +49,11 @@ func (e *TypeScriptAPIExtractor) Extract(ctx *projctx.ProjectContext) error {
 		for sc.Scan() {
 			lineNo++
 			line := sc.Text()
-			if m := reExpressRoute.FindStringSubmatch(line); len(m) == 3 {
+			// A line may hold several route registrations; match all.
+			for _, m := range reExpressRoute.FindAllStringSubmatch(line, -1) {
+				if len(m) != 3 {
+					continue
+				}
 				method := strings.ToUpper(m[1])
 				routePath := m[2]
 				ep := projctx.APIEndpoint{
@@ -66,9 +70,11 @@ func (e *TypeScriptAPIExtractor) Extract(ctx *projctx.ProjectContext) error {
 				}
 				ep.Parameters = pathParams(routePath)
 				endpoints = append(endpoints, ep)
-				continue
 			}
-			if m := reChainedRoute.FindStringSubmatch(line); len(m) == 3 {
+			for _, m := range reChainedRoute.FindAllStringSubmatch(line, -1) {
+				if len(m) != 3 {
+					continue
+				}
 				ep := projctx.APIEndpoint{
 					Method: strings.ToUpper(m[2]), Path: m[1],
 					File: filepath.ToSlash(rel), Line: lineNo,

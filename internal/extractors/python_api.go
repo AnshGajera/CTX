@@ -63,14 +63,20 @@ func (e *PythonAPIExtractor) Extract(ctx *projctx.ProjectContext) error {
 		for sc.Scan() {
 			lineNo++
 			line := sc.Text()
-			if m := reFastAPIRoute.FindStringSubmatch(line); len(m) == 3 {
+			// A line may hold several decorators/calls; match all.
+			for _, m := range reFastAPIRoute.FindAllStringSubmatch(line, -1) {
+				if len(m) != 3 {
+					continue
+				}
 				pendingLines = append(pendingLines, struct {
 					method, route string
 					line          int
 				}{strings.ToUpper(m[1]), m[2], lineNo})
-				continue
 			}
-			if m := reFlaskRoute.FindStringSubmatch(line); len(m) >= 2 {
+			for _, m := range reFlaskRoute.FindAllStringSubmatch(line, -1) {
+				if len(m) < 2 {
+					continue
+				}
 				method := "GET"
 				if len(m) >= 3 && m[2] != "" {
 					method = strings.ToUpper(strings.Trim(m[2], "'\" "))
@@ -83,11 +89,12 @@ func (e *PythonAPIExtractor) Extract(ctx *projctx.ProjectContext) error {
 					method, route string
 					line          int
 				}{method, m[1], lineNo})
-				continue
 			}
-			if m := reDjangoPath.FindStringSubmatch(line); len(m) == 3 {
+			for _, m := range reDjangoPath.FindAllStringSubmatch(line, -1) {
+				if len(m) != 3 {
+					continue
+				}
 				endpoints = append(endpoints, projctx.APIEndpoint{Method: "ALL", Path: "/" + m[1], Handler: m[2], File: filepath.ToSlash(rel), Line: lineNo, Parameters: pathParams(m[1])})
-				continue
 			}
 			if m := reDefLine.FindStringSubmatch(line); len(m) == 2 {
 				pendingHandler = m[1]

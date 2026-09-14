@@ -16,14 +16,16 @@ go build -o ctx ./cmd/ctx
 ## Quickstart
 
 ```bash
-ctx init
+ctx init       # interactive wizard: banner, project name, section toggles, MCP editor setup
 ctx extract
 ctx status
 ctx search "auth flow"
 ctx export --format openapi -o openapi.json
-ctx serve --port 3100        # HTTP MCP
-ctx serve --stdio            # Cursor / Claude Desktop
+ctx serve --port 3100        # HTTP REST API
+ctx serve --stdio            # MCP for Cursor / Claude Desktop / VS Code
 ```
+
+Non-interactive (CI/scripts): `ctx init --yes` skips the wizard; `--editor cursor|claude-desktop|vscode|none` and `--sections api_endpoints` preselect wizard answers. `--json` on init/extract/status/diff/log/search/eval gives machine-readable output.
 
 ## Commands
 
@@ -48,6 +50,8 @@ ctx serve --stdio            # Cursor / Claude Desktop
 ```json
 {"mcpServers": {"ctx": {"command": "ctx", "args": ["serve", "--stdio"]}}}
 ```
+
+`ctx init` can write this for you: choose `cursor` (writes `.cursor/mcp.json`), `vscode` (writes `.vscode/mcp.json`), or `claude-desktop` (merges into the Claude Desktop user config, preserving your other servers).
 
 **HTTP mode** (`ctx serve --port 3100`) is a plain REST API for scripts and debugging (`/context`, `/context/apis`, `/mcp/tools/*`) — it is *not* the MCP Streamable HTTP protocol, so point MCP clients at stdio.
 
