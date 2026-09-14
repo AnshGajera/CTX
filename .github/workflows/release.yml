@@ -16,31 +16,46 @@ jobs:
           go-version: "1.22"
       - name: Build all platforms
         env:
-          VERSION: ${{ github.ref_name }}
-          COMMIT: ${{ github.sha }}
+          TAG_NAME: ${{ github.ref_name }}
+          TAG_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          VER="${VERSION#v}"
+          echo "pwd=$(pwd)"
+          go version
+          ls
+          test -f go.mod || { echo "go.mod missing"; exit 1; }
+          test -d cmd/ctx || { echo "cmd/ctx missing"; exit 1; }
+          VER="${TAG_NAME#v}"
+          SHORT_SHA="$(echo "${TAG_SHA}" | cut -c1-8)"
           DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          LDFLAGS="-s -w -X github.com/AnshGajera/CTX/internal/version.Version=${VERSION} -X github.com/AnshGajera/CTX/internal/version.Commit=${COMMIT::8} -X github.com/AnshGajera/CTX/internal/version.Date=${DATE}"
+          echo "Releasing ctx ${TAG_NAME} (${SHORT_SHA})"
+          LDFLAGS="-s -w -X github.com/AnshGajera/CTX/internal/version.Version=${TAG_NAME} -X github.com/AnshGajera/CTX/internal/version.Commit=${SHORT_SHA} -X github.com/AnshGajera/CTX/internal/version.Date=${DATE}"
           mkdir -p dist stage
-          build_one() { # $1=goos $2=goarch $3=ext(tar.gz|zip)
-            echo "Building $1/$2..."
-            CGO_ENABLED=0 GOOS="$1" GOARCH="$2" go build -ldflags "$LDFLAGS" -o stage/ctx${4:-} ./cmd/ctx
-            cp README.md LICENSE stage/
-            ARCHIVE="ctx_${VER}_$1_$2.$3"
-            if [ "$3" = "zip" ]; then
-              (cd stage && zip -q "../dist/${ARCHIVE}" ctx${4:-} README.md LICENSE)
-            else
-              tar -czf "dist/${ARCHIVE}" -C stage "ctx${4:-}" README.md LICENSE
-            fi
-            rm -f stage/ctx${4:-}
-          }
-          build_one linux amd64 tar.gz
-          build_one linux arm64 tar.gz
-          build_one darwin amd64 tar.gz
-          build_one darwin arm64 tar.gz
-          build_one windows amd64 zip ".exe"
+          echo "--- linux/amd64 ---"
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o stage/ctx ./cmd/ctx
+          cp README.md LICENSE stage/
+          tar -czf "dist/ctx_${VER}_linux_amd64.tar.gz" -C stage ctx README.md LICENSE
+          rm -f stage/ctx
+          echo "--- linux/arm64 ---"
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags "$LDFLAGS" -o stage/ctx ./cmd/ctx
+          cp README.md LICENSE stage/
+          tar -czf "dist/ctx_${VER}_linux_arm64.tar.gz" -C stage ctx README.md LICENSE
+          rm -f stage/ctx
+          echo "--- darwin/amd64 ---"
+          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags "$LDFLAGS" -o stage/ctx ./cmd/ctx
+          cp README.md LICENSE stage/
+          tar -czf "dist/ctx_${VER}_darwin_amd64.tar.gz" -C stage ctx README.md LICENSE
+          rm -f stage/ctx
+          echo "--- darwin/arm64 ---"
+          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags "$LDFLAGS" -o stage/ctx ./cmd/ctx
+          cp README.md LICENSE stage/
+          tar -czf "dist/ctx_${VER}_darwin_arm64.tar.gz" -C stage ctx README.md LICENSE
+          rm -f stage/ctx
+          echo "--- windows/amd64 ---"
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags "$LDFLAGS" -o stage/ctx.exe ./cmd/ctx
+          cp README.md LICENSE stage/
+          (cd stage && zip -q "../dist/ctx_${VER}_windows_amd64.zip" ctx.exe README.md LICENSE)
+          rm -f stage/ctx.exe
           (cd dist && sha256sum * > checksums.txt)
           ls -la dist
       - name: Publish release
