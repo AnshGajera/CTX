@@ -1,0 +1,27 @@
+version: 2
+project_name: ctx
+builds:
+  - id: ctx
+    main: ./cmd/ctx
+    binary: ctx
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w -X github.com/ctxdev/ctx/internal/version.Version={{.Version}} -X github.com/ctxdev/ctx/internal/version.Commit={{.Commit}} -X github.com/ctxdev/ctx/internal/version.Date={{.Date}}
+archives:
+  - id: default
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+      - LICENSE
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+release:
+  footer: |
+    Install: `curl -fsSL https://raw.githubusercontent.com/ctxdev/ctx/main/scripts/install.sh | bash`

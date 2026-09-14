@@ -1,0 +1,9 @@
+ctx
+ctx.exe
+.ctx/
+dist/
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+.env

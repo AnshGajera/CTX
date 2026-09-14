@@ -1,0 +1,26 @@
+name: build
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Build
+        run: go build ./...
+      - name: Test Go
+        run: go test ./...
+      - name: Vet
+        run: go vet ./...
+      - name: Test Python
+        run: |
+          pip install -r ctx-ml/requirements.txt
+          python -m pytest ctx-ml/tests -q

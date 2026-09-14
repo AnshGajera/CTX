@@ -1,0 +1,26 @@
+# ctx ignores
+*.env
+.env
+*.pem
+*.key
+secrets/
+node_modules/
+vendor/
+dist/
+build/
+.next/
+__pycache__/
+.venv/
+.idea/
+.vscode/
+coverage/
+.ctx/
+.turbo/
+.cache/
+target/
+*.mp4
+*.mov
+*.png
+*.jpg
+*.jpeg
+*.pdf

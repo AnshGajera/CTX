@@ -1,0 +1,7 @@
+services:
+  ctx-ml:
+    build: ./ctx-ml
+    ports:
+      - "8001:8001"
+    environment:
+      - CTX_EMBED_MODEL=all-MiniLM-L6-v2
