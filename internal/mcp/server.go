@@ -43,6 +43,19 @@ func writeJSON(w http.ResponseWriter, v any) {
 // Handler returns the HTTP mux.
 func (s *MCPServer) Handler() http.Handler {
 	mux := http.NewServeMux()
+	// Local web dashboard (single-file, offline, no build step).
+	mux.HandleFunc("/ui", serveUI)
+	mux.HandleFunc("/ui/", serveUI)
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" {
+			http.Redirect(w, r, "/ui", http.StatusFound)
+			return
+		}
+		http.NotFound(w, r)
+	})
+	mux.HandleFunc("/api/history", s.handleHistory)
+	mux.HandleFunc("/api/diff", s.handleDiff)
+	mux.HandleFunc("/api/search", s.handleSearch)
 	mux.HandleFunc("/mcp/tools/list", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost && r.Method != http.MethodGet {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -199,4 +212,78 @@ func (s *MCPServer) handleToolCall(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]any{"result": result})
+}
+
+func (s *MCPServer) handleHistory(w http.ResponseWriter, r *http.Request) {
+	snaps, err := s.store.Log(50)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if snaps == nil {
+		snaps = []versioning.ContextSnapshot{}
+	}
+	writeJSON(w, map[string]any{"snapshots": snaps})
+}
+
+func (s *MCPServer) handleDiff(w http.ResponseWriter, r *http.Request) {
+	head, err := s.store.GetHead()
+	if err != nil {
+		http.Error(w, "no snapshots (run ctx extract first)", http.StatusNotFound)
+		return
+	}
+	from := r.URL.Query().Get("from")
+	to := r.URL.Query().Get("to")
+	if to == "" {
+		to = head
+	}
+	if from == "" {
+		cur, err := s.store.LoadSnapshot(to)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		if cur.ParentHash == "" {
+			writeJSON(w, map[string]any{"summary": "only one snapshot — extract again after changing code"})
+			return
+		}
+		from = cur.ParentHash
+	}
+	s1, err := s.store.LoadSnapshot(from)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	s2, err := s.store.LoadSnapshot(to)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	c1, _ := versioning.SnapshotToContext(s1)
+	c2, _ := versioning.SnapshotToContext(s2)
+	writeJSON(w, versioning.ComputeDiff(c1, c2))
+}
+
+func (s *MCPServer) handleSearch(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query().Get("q")
+	if q == "" {
+		q = r.URL.Query().Get("query")
+	}
+	if strings.TrimSpace(q) == "" {
+		http.Error(w, "missing ?q=", http.StatusBadRequest)
+		return
+	}
+	topK := 5
+	if v := r.URL.Query().Get("top_k"); v != "" {
+		var n int
+		if _, err := fmt.Sscanf(v, "%d", &n); err == nil && n > 0 && n <= 50 {
+			topK = n
+		}
+	}
+	ctx, err := s.loadHead()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	writeJSON(w, SearchChunks(ctx, q, topK))
 }

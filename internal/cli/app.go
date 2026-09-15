@@ -32,6 +32,7 @@ func NewApp() *cli.App {
 			commands.SearchCommand(),
 			commands.EvalCommand(),
 			commands.ExportCommand(),
+			commands.DashboardCommand(),
 		},
 	}
 }
