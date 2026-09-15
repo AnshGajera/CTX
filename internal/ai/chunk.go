@@ -63,6 +63,8 @@ func (c *Chunker) Chunk(ctx *projctx.ProjectContext) []Chunk {
 		for _, k := range ctx.FileStructure.KeyFiles {
 			add("file", "file:"+k.Path, "key file "+k.Path+" purpose="+k.Purpose, k.Path)
 		}
+	}
+	if ctx.Patterns != nil {
 		for _, p := range ctx.Patterns.Patterns {
 			add("pattern", "pattern:"+p.Name, "pattern "+p.Name+": "+p.Description+" examples="+strings.Join(p.Examples, ", "), "")
 		}

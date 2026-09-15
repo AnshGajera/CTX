@@ -59,14 +59,10 @@ func CanonicalHash(ctx *projctx.ProjectContext) (string, error) {
 	return hex.EncodeToString(sum[:16]), nil
 }
 
-// autoMessages are messages for which identical content does not create a new snapshot.
-var autoMessages = map[string]bool{
-	"extract": true, "extract (on-commit)": true, "watch: auto-update": true,
-}
-
 // Commit serializes ctx, hashes, saves snapshot, updates HEAD.
-// Returns deduped=true when content is unchanged and the message is automatic;
-// in that case the existing HEAD snapshot is returned and nothing is written.
+// Returns deduped=true when content is unchanged; in that case the
+// existing HEAD snapshot is returned and nothing is written, preserving
+// the original Message/ParentHash/Timestamp.
 func (s *ContextStore) Commit(ctx *projctx.ProjectContext, message string) (snap *ContextSnapshot, deduped bool, err error) {
 	if err := os.MkdirAll(s.snapshotsDir(), 0o755); err != nil {
 		return nil, false, fmt.Errorf("create snapshots dir: %w", err)
@@ -77,7 +73,7 @@ func (s *ContextStore) Commit(ctx *projctx.ProjectContext, message string) (snap
 	}
 	ctx.ContentHash = hash
 	parent, _ := s.GetHead()
-	if parent != "" && autoMessages[message] {
+	if parent != "" {
 		if head, lerr := s.LoadSnapshot(parent); lerr == nil {
 			if oldCtx, derr := SnapshotToContext(head); derr == nil {
 				if oldCtx.ContentHash == "" {

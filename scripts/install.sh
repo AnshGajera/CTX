@@ -54,13 +54,15 @@ trap 'rm -rf "$TMP"' EXIT
 cd "$TMP"
 ARCHIVE_NAME=$(basename "$TARBALL_URL")
 curl -fsSL -o "$ARCHIVE_NAME" "$TARBALL_URL"
-if [ -n "$SUM_URL" ]; then
-  curl -fsSL -o checksums.txt "$SUM_URL"
-  if command -v sha256sum >/dev/null; then
-    grep "$ARCHIVE_NAME" checksums.txt | sha256sum -c -
-  elif command -v shasum >/dev/null; then
-    grep "$ARCHIVE_NAME" checksums.txt | shasum -a 256 -c -
-  fi
+if [ -z "$SUM_URL" ]; then
+  echo "Checksum asset not found for ${VERSION}; refusing to install unverified binary" >&2
+  exit 1
+fi
+curl -fsSL -o checksums.txt "$SUM_URL"
+if command -v sha256sum >/dev/null; then
+  grep "$ARCHIVE_NAME" checksums.txt | sha256sum -c -
+elif command -v shasum >/dev/null; then
+  grep "$ARCHIVE_NAME" checksums.txt | shasum -a 256 -c -
 fi
 
 mkdir -p "$BIN_DIR"

@@ -32,6 +32,7 @@ var (
 	reViteEnv           = regexp.MustCompile(`import\.meta\.env\.([A-Z0-9_]+)`)
 	reDockerEnv         = regexp.MustCompile(`^\s*-\s*([A-Z0-9_]+)=`)
 	reDockerfileEnv     = regexp.MustCompile(`^ENV\s+([A-Z0-9_]+)`)
+	reNextPublic        = regexp.MustCompile(`NEXT_PUBLIC_[A-Z0-9_]+`)
 )
 
 func categorizeEnv(name string) string {
@@ -97,7 +98,7 @@ func (e *EnvironmentExtractor) Extract(ctx *projctx.ProjectContext) error {
 			}
 		}
 		// NEXT_PUBLIC_* pattern
-		for _, m := range regexp.MustCompile(`NEXT_PUBLIC_[A-Z0-9_]+`).FindAllString(content, -1) {
+		for _, m := range reNextPublic.FindAllString(content, -1) {
 			if _, ok := vars[m]; !ok {
 				vars[m] = &projctx.EnvVariable{Name: m, Category: "general", Required: false}
 			}

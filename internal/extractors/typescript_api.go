@@ -38,6 +38,9 @@ func (e *TypeScriptAPIExtractor) Extract(ctx *projctx.ProjectContext) error {
 		if strings.Contains(rel, "node_modules") || strings.HasSuffix(base, ".test.ts") || strings.HasSuffix(base, ".spec.ts") {
 			return nil
 		}
+		if info.Size() > 1_000_000 {
+			return nil
+		}
 		f, err := os.Open(path)
 		if err != nil {
 			return nil

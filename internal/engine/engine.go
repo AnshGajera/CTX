@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"sort"
@@ -162,7 +163,15 @@ func (e *ExtractionEngine) Extract() (*projctx.ProjectContext, error) {
 		return nil, fmt.Errorf("hash context: %w", err)
 	}
 	ctx.ContentHash = hash
-	_ = errs
+	var extractErrs []error
+	for _, e := range errs {
+		if e != "" {
+			extractErrs = append(extractErrs, errors.New(e))
+		}
+	}
+	if len(extractErrs) > 0 {
+		return ctx, errors.Join(extractErrs...)
+	}
 	return ctx, nil
 }
 
@@ -178,6 +187,10 @@ func mergePartials(dst *projctx.ProjectContext, partials []*projctx.ProjectConte
 	envSeen := map[string]bool{}
 	ruleSeen := map[string]bool{}
 	patSeen := map[string]*projctx.CodePattern{}
+	intSeen := map[string]bool{}
+	decSeen := map[string]bool{}
+	rcSeen := map[string]bool{}
+	aaSeen := map[string]bool{}
 	todoSeen := map[string]bool{}
 	reqSeen := map[string]bool{}
 	profSeen := map[string]bool{}
@@ -248,14 +261,28 @@ func mergePartials(dst *projctx.ProjectContext, partials []*projctx.ProjectConte
 			if dst.Dependencies == nil {
 				dst.Dependencies = &projctx.DependencyContext{}
 			}
-			for _, dep := range append(append([]projctx.Dependency{}, p.Dependencies.Direct...), p.Dependencies.Dev...) {
+			for _, dep := range p.Dependencies.Direct {
 				if depSeen[dep.Name] {
 					continue
 				}
 				depSeen[dep.Name] = true
 				dst.Dependencies.Direct = append(dst.Dependencies.Direct, dep)
 			}
-			dst.Dependencies.Internal = append(dst.Dependencies.Internal, p.Dependencies.Internal...)
+			for _, dep := range p.Dependencies.Dev {
+				if depSeen[dep.Name] {
+					continue
+				}
+				depSeen[dep.Name] = true
+				dst.Dependencies.Dev = append(dst.Dependencies.Dev, dep)
+			}
+			for _, in := range p.Dependencies.Internal {
+				key := in.From + "|" + in.To + "|" + in.Type
+				if intSeen[key] {
+					continue
+				}
+				intSeen[key] = true
+				dst.Dependencies.Internal = append(dst.Dependencies.Internal, in)
+			}
 		}
 		if p.Environment != nil {
 			if dst.Environment == nil {
@@ -303,7 +330,14 @@ func mergePartials(dst *projctx.ProjectContext, partials []*projctx.ProjectConte
 			if dst.Decisions == nil {
 				dst.Decisions = &projctx.DecisionContext{}
 			}
-			dst.Decisions.Decisions = append(dst.Decisions.Decisions, p.Decisions.Decisions...)
+			for _, dc := range p.Decisions.Decisions {
+				key := dc.ID + "\x00" + dc.Title
+				if decSeen[key] {
+					continue
+				}
+				decSeen[key] = true
+				dst.Decisions.Decisions = append(dst.Decisions.Decisions, dc)
+			}
 		}
 		if p.Patterns != nil {
 			if dst.Patterns == nil {
@@ -351,8 +385,20 @@ func mergePartials(dst *projctx.ProjectContext, partials []*projctx.ProjectConte
 			if d.DirtyFiles == 0 {
 				d.DirtyFiles = s.DirtyFiles
 			}
-			d.RecentlyChanged = append(d.RecentlyChanged, s.RecentlyChanged...)
-			d.ActiveAreas = append(d.ActiveAreas, s.ActiveAreas...)
+			for _, r := range s.RecentlyChanged {
+				if rcSeen[r] {
+					continue
+				}
+				rcSeen[r] = true
+				d.RecentlyChanged = append(d.RecentlyChanged, r)
+			}
+			for _, a := range s.ActiveAreas {
+				if aaSeen[a] {
+					continue
+				}
+				aaSeen[a] = true
+				d.ActiveAreas = append(d.ActiveAreas, a)
+			}
 			for _, td := range s.TODOs {
 				key := td.File + ":" + strconv.Itoa(td.Line) + ":" + td.Text
 				if todoSeen[key] {

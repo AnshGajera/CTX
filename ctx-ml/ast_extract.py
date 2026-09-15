@@ -21,6 +21,9 @@ SKIP_DIRS = {
 
 HTTP_METHODS = {"get", "post", "put", "patch", "delete"}
 
+MAX_FILE_SIZE = 1_000_000
+MAX_FILES_SCANNED = 20000
+
 try:  # optional; TS extraction degrades gracefully without it
     from tree_sitter import Language, Parser  # type: ignore
     import tree_sitter_typescript as _tst  # type: ignore
@@ -30,22 +33,26 @@ except Exception:  # pragma: no cover
 
 
 def _iter_files(root: str, exts: set[str]):
+    scanned = 0
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
         rel_dir = os.path.relpath(dirpath, root).replace(os.sep, "/")
         if rel_dir.split("/")[0] in {"tests", "test"}:
             continue
         for fn in filenames:
+            if scanned >= MAX_FILES_SCANNED:
+                return
             lower = fn.lower()
             if lower.startswith("test_") or lower.endswith(("_test.py", "_test.ts", "_test.js", ".test.ts", ".spec.ts")):
                 continue
             if os.path.splitext(fn)[1].lower() in exts:
                 full = os.path.join(dirpath, fn)
                 try:
-                    if os.path.getsize(full) > 1_000_000:
+                    if os.path.getsize(full) > MAX_FILE_SIZE:
                         continue
                 except OSError:
                     continue
+                scanned += 1
                 yield full
 
 

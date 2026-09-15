@@ -158,7 +158,7 @@ func ContextForFile(ctx *projctx.ProjectContext, filePath string) any {
 	if ctx.APIs != nil {
 		var eps []projctx.APIEndpoint
 		for _, e := range ctx.APIs.Endpoints {
-			if strings.EqualFold(e.File, fp) || strings.Contains(strings.ToLower(e.File), strings.ToLower(fp)) {
+			if matchFilePath(e.File, fp) {
 				eps = append(eps, e)
 			}
 		}
@@ -169,7 +169,7 @@ func ContextForFile(ctx *projctx.ProjectContext, filePath string) any {
 	if ctx.Database != nil {
 		var models []projctx.DatabaseModel
 		for _, m := range ctx.Database.Models {
-			if strings.EqualFold(m.File, fp) || strings.Contains(strings.ToLower(m.File), strings.ToLower(fp)) {
+			if matchFilePath(m.File, fp) {
 				models = append(models, m)
 			}
 		}
@@ -263,6 +263,15 @@ func containsAny(hay string, needles []string) bool {
 		}
 	}
 	return false
+}
+
+// matchFilePath matches exact case-insensitive paths or path-segment suffixes.
+func matchFilePath(candidate, query string) bool {
+	lc, lq := strings.ToLower(candidate), strings.ToLower(query)
+	if lq == "" {
+		return false
+	}
+	return lc == lq || strings.HasSuffix(lc, "/"+lq)
 }
 
 func ifThen(cond bool, a, b string) string {

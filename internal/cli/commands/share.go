@@ -49,8 +49,18 @@ func ShareCommand() *cli.Command {
 func LoginCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "login",
-		Usage: "[preview] Login and store credentials (needs ctx cloud backend)",
+		Usage: "[preview] Login and store credentials (needs ctx cloud backend; note: interactive password prompt echoes input, no masking)",
+		Flags: []cli.Flag{
+			&cli.StringFlag{Name: "token", Usage: "store API token directly (skips email/password prompt)"},
+		},
 		Action: func(c *cli.Context) error {
+			if tok := c.String("token"); tok != "" {
+				if err := csync.SaveToken(tok); err != nil {
+					return err
+				}
+				color.Green("Logged in, credentials stored")
+				return nil
+			}
 			reader := bufio.NewReader(os.Stdin)
 			fmt.Print("Email: ")
 			email, _ := reader.ReadString('\n')

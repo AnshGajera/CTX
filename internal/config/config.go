@@ -111,11 +111,21 @@ func Load(path string) (Config, error) {
 	if err := toml.Unmarshal(data, &cfg); err != nil {
 		return cfg, fmt.Errorf("parse config %s: %w", path, err)
 	}
-	if cfg.Core.APIURL == "" {
-		cfg.Core.APIURL = "https://api.ctx.dev"
+	// Only apply URL defaults when the key is absent, so an explicit
+	// empty value (e.g. ml_url="") disables the feature instead of
+	// being forced back to the default.
+	var raw map[string]any
+	_ = toml.Unmarshal(data, &raw)
+	coreRaw, _ := raw["core"].(map[string]any)
+	if _, ok := coreRaw["api_url"]; !ok {
+		if cfg.Core.APIURL == "" {
+			cfg.Core.APIURL = "https://api.ctx.dev"
+		}
 	}
-	if cfg.Core.MLURL == "" {
-		cfg.Core.MLURL = "http://localhost:8001"
+	if _, ok := coreRaw["ml_url"]; !ok {
+		if cfg.Core.MLURL == "" {
+			cfg.Core.MLURL = "http://localhost:8001"
+		}
 	}
 	return cfg, nil
 }

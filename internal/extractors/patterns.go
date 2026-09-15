@@ -77,8 +77,8 @@ func (e *PatternExtractor) Extract(ctx *projctx.ProjectContext) error {
 	}
 	if st, err := os.Stat(filepath.Join(e.Root, "components")); err == nil && st.IsDir() {
 		n := 0
-		_ = filepath.Walk(filepath.Join(e.Root, "components"), func(p string, info os.FileInfo, err error) error {
-			if err == nil && !info.IsDir() {
+		_ = e.WalkFiles(func(path, rel string, info os.FileInfo) error {
+			if strings.HasPrefix(filepath.ToSlash(rel), "components/") {
 				n++
 			}
 			return nil

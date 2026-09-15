@@ -3,9 +3,25 @@ package versioning
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	projctx "github.com/AnshGajera/CTX/internal/context"
 )
+
+// ChangedDep records a version change for a same-name dependency.
+type ChangedDep struct {
+	Name       string `json:"name"`
+	OldVersion string `json:"old_version,omitempty"`
+	NewVersion string `json:"new_version,omitempty"`
+}
+
+// ChangedEnvVar records a change for a same-name env var.
+type ChangedEnvVar struct {
+	Name       string `json:"name"`
+	OldDefault string `json:"old_default,omitempty"`
+	NewDefault string `json:"new_default,omitempty"`
+	Required   bool   `json:"required,omitempty"`
+}
 
 // ContextDiff describes changes between two contexts.
 type ContextDiff struct {
@@ -17,6 +33,8 @@ type ContextDiff struct {
 	RemovedEnvVars   []projctx.EnvVariable   `json:"removed_env_vars,omitempty"`
 	AddedDeps        []projctx.Dependency    `json:"added_dependencies,omitempty"`
 	RemovedDeps      []projctx.Dependency    `json:"removed_dependencies,omitempty"`
+	ChangedDeps      []ChangedDep            `json:"changed_dependencies,omitempty"`
+	ChangedEnvVars   []ChangedEnvVar         `json:"changed_env_vars,omitempty"`
 	Summary          string                  `json:"summary"`
 }
 
@@ -30,13 +48,13 @@ func ComputeDiff(old, new *projctx.ProjectContext) *ContextDiff {
 	oldEP := map[string]projctx.APIEndpoint{}
 	if old.APIs != nil {
 		for _, e := range old.APIs.Endpoints {
-			oldEP[e.Method+" "+e.Path] = e
+			oldEP[strings.ToUpper(e.Method)+" "+e.Path] = e
 		}
 	}
 	newEP := map[string]projctx.APIEndpoint{}
 	if new.APIs != nil {
 		for _, e := range new.APIs.Endpoints {
-			newEP[e.Method+" "+e.Path] = e
+			newEP[strings.ToUpper(e.Method)+" "+e.Path] = e
 		}
 	}
 	for k, e := range newEP {
@@ -118,12 +136,37 @@ func ComputeDiff(old, new *projctx.ProjectContext) *ContextDiff {
 			d.RemovedDeps = append(d.RemovedDeps, dep)
 		}
 	}
+	for k, oldDep := range oldD {
+		if newDep, ok := newD[k]; ok && oldDep.Version != newDep.Version {
+			d.ChangedDeps = append(d.ChangedDeps, ChangedDep{
+				Name:       k,
+				OldVersion: oldDep.Version,
+				NewVersion: newDep.Version,
+			})
+		}
+	}
+	for k, oldV := range oldE {
+		if newV, ok := newE[k]; ok && (oldV.Default != newV.Default || oldV.Required != newV.Required) {
+			d.ChangedEnvVars = append(d.ChangedEnvVars, ChangedEnvVar{
+				Name:       k,
+				OldDefault: oldV.Default,
+				NewDefault: newV.Default,
+				Required:   newV.Required,
+			})
+		}
+	}
 
 	sort.Slice(d.AddedEndpoints, func(i, j int) bool {
 		return d.AddedEndpoints[i].Path < d.AddedEndpoints[j].Path
 	})
 	sort.Slice(d.RemovedEndpoints, func(i, j int) bool {
 		return d.RemovedEndpoints[i].Path < d.RemovedEndpoints[j].Path
+	})
+	sort.Slice(d.ChangedDeps, func(i, j int) bool {
+		return d.ChangedDeps[i].Name < d.ChangedDeps[j].Name
+	})
+	sort.Slice(d.ChangedEnvVars, func(i, j int) bool {
+		return d.ChangedEnvVars[i].Name < d.ChangedEnvVars[j].Name
 	})
 
 	d.Summary = fmt.Sprintf("+%d endpoints, -%d endpoints, +%d models, -%d models, +%d env, -%d env, +%d deps, -%d deps",
@@ -139,5 +182,6 @@ func (d *ContextDiff) IsEmpty() bool {
 	return len(d.AddedEndpoints) == 0 && len(d.RemovedEndpoints) == 0 &&
 		len(d.AddedModels) == 0 && len(d.RemovedModels) == 0 &&
 		len(d.AddedEnvVars) == 0 && len(d.RemovedEnvVars) == 0 &&
-		len(d.AddedDeps) == 0 && len(d.RemovedDeps) == 0
+		len(d.AddedDeps) == 0 && len(d.RemovedDeps) == 0 &&
+		len(d.ChangedDeps) == 0 && len(d.ChangedEnvVars) == 0
 }

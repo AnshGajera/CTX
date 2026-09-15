@@ -27,12 +27,13 @@ var (
 	reMongooseRef    = regexp.MustCompile(`ref\s*:\s*['"](\w+)['"]`)
 	reTypeORMEntity  = regexp.MustCompile(`@Entity\s*(\([^)]*\))?`)
 	reTSClass        = regexp.MustCompile(`(?:export\s+)?(?:default\s+)?class\s+(\w+)`)
-	reTSField        = regexp.MustCompile(`^\s*(\w+)[?!]?\s*:\s*([\w\[\]<>]+)`)
+	reTSField        = regexp.MustCompile(`^\s*(\w+)([?!]?)\s*:\s*([\w\[\]<>]+)`)
 	rePyClass        = regexp.MustCompile(`^class\s+(\w+)\s*\(([^)]*)\)`)
 	reSqlaColumn     = regexp.MustCompile(`^\s*(\w+)\s*=\s*(?:db\.)?Column\s*\(\s*(\w+)`)
 	reDjangoField    = regexp.MustCompile(`^\s*(\w+)\s*=\s*models\.(\w+)\s*\(`)
 	reGoStruct       = regexp.MustCompile(`^type\s+(\w+)\s+struct\s*\{`)
 	reGoField        = regexp.MustCompile(`^\s*(\w+)\s+([\w\[\]\*\.]+)\s*` + "`" + `([^` + "`" + `]*)` + "`")
+	reGoFieldNoTag   = regexp.MustCompile(`^\s*(\w+)\s+([\w\[\]\*\.]+)\s*$`)
 	reGormTag        = regexp.MustCompile(`gorm:"([^"]*)"`)
 )
 
@@ -93,8 +94,19 @@ func inferORM(models []projctx.DatabaseModel) string {
 	// ORM is per-model in practice; report the most common source.
 	counts := map[string]int{}
 	for _, m := range models {
-		if strings.HasPrefix(m.Table, "mongoose:") {
+		switch {
+		case strings.HasPrefix(m.Table, "mongoose:"):
 			counts["mongoose"]++
+		case strings.HasPrefix(m.Table, "gorm:"):
+			counts["gorm"]++
+		case strings.HasPrefix(m.Table, "typeorm:"):
+			counts["typeorm"]++
+		case strings.HasPrefix(m.Table, "sqlalchemy:"):
+			counts["sqlalchemy"]++
+		case strings.HasPrefix(m.Table, "django:"):
+			counts["django"]++
+		case strings.HasPrefix(m.Table, "prisma:"):
+			counts["prisma"]++
 		}
 	}
 	best, bestN := "", 0
@@ -124,10 +136,11 @@ func (e *GenericModelsExtractor) parseJS(path, rel string, db *projctx.DatabaseC
 		no++
 		lines = append(lines, line{no, sc.Text()})
 	}
-	full := ""
+	var fullB strings.Builder
 	for _, l := range lines {
-		full += l.text + "\n"
+		fullB.WriteString(l.text + "\n")
 	}
+	full := fullB.String()
 	isMongoose := strings.Contains(full, "mongoose") || reMongooseSchema.MatchString(full)
 	isTypeORM := strings.Contains(full, "@Entity")
 
@@ -188,7 +201,7 @@ func (e *GenericModelsExtractor) parseJS(path, rel string, db *projctx.DatabaseC
 					break
 				}
 				seen[name] = true
-				model := projctx.DatabaseModel{Name: name, Table: name, File: filepathToSlash(rel)}
+				model := projctx.DatabaseModel{Name: name, Table: "typeorm:" + name, File: filepathToSlash(rel)}
 				depth := 0
 				started := false
 				for k := j; k < len(lines); k++ {
@@ -198,8 +211,8 @@ func (e *GenericModelsExtractor) parseJS(path, rel string, db *projctx.DatabaseC
 						started = true
 					}
 					if started {
-						if fm := reTSField.FindStringSubmatch(t); len(fm) == 3 && !strings.Contains(t, "(") {
-							model.Fields = append(model.Fields, projctx.ModelField{Name: fm[1], Type: fm[2], Nullable: strings.Contains(fm[1], "?")})
+						if fm := reTSField.FindStringSubmatch(t); len(fm) == 4 && !strings.Contains(t, "(") {
+							model.Fields = append(model.Fields, projctx.ModelField{Name: fm[1], Type: fm[3], Nullable: fm[2] == "?"})
 						}
 					}
 					if started && depth <= 0 {
@@ -226,6 +239,7 @@ func (e *GenericModelsExtractor) parsePython(path, rel string, db *projctx.Datab
 	for sc.Scan() {
 		lines = append(lines, sc.Text())
 	}
+	full := strings.Join(lines, "\n")
 	for i, l := range lines {
 		m := rePyClass.FindStringSubmatch(l)
 		if len(m) != 3 {
@@ -234,7 +248,7 @@ func (e *GenericModelsExtractor) parsePython(path, rel string, db *projctx.Datab
 		name, bases := m[1], m[2]
 		kind := ""
 		switch {
-		case strings.Contains(bases, "db.Model") || strings.Contains(bases, "Base") && strings.Contains(strings.Join(lines, "\n"), "Column"):
+		case strings.Contains(bases, "db.Model") || strings.Contains(bases, "Base") && strings.Contains(full, "Column"):
 			kind = "sqlalchemy"
 		case strings.Contains(bases, "models.Model") || strings.Contains(bases, "Model"):
 			// disambiguate django vs sqlalchemy by field syntax below
@@ -256,7 +270,7 @@ func (e *GenericModelsExtractor) parsePython(path, rel string, db *projctx.Datab
 			continue
 		}
 		seen[name] = true
-		model := projctx.DatabaseModel{Name: name, Table: name, File: filepathToSlash(rel)}
+		model := projctx.DatabaseModel{Name: name, Table: kind + ":" + name, File: filepathToSlash(rel)}
 		for k := i + 1; k < len(lines); k++ {
 			t := lines[k]
 			if t != "" && !strings.HasPrefix(t, " ") && !strings.HasPrefix(t, "\t") {
@@ -305,7 +319,12 @@ func (e *GenericModelsExtractor) parseGo(path, rel string, db *projctx.DatabaseC
 			}
 			fm := reGoField.FindStringSubmatch(t)
 			if len(fm) == 0 {
-				continue
+				// Field without a backtick tag, e.g. `Name string`.
+				if nm := reGoFieldNoTag.FindStringSubmatch(strings.SplitN(t, "//", 2)[0]); len(nm) == 3 {
+					fm = []string{nm[0], nm[1], nm[2]}
+				} else {
+					continue
+				}
 			}
 			tag := ""
 			if len(fm) >= 4 {
@@ -334,7 +353,7 @@ func (e *GenericModelsExtractor) parseGo(path, rel string, db *projctx.DatabaseC
 			continue
 		}
 		seen[name] = true
-		db.Models = append(db.Models, projctx.DatabaseModel{Name: name, Table: name, File: filepathToSlash(rel), Fields: fields})
+		db.Models = append(db.Models, projctx.DatabaseModel{Name: name, Table: "gorm:" + name, File: filepathToSlash(rel), Fields: fields})
 	}
 }
 

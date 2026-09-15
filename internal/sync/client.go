@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"time"
@@ -35,8 +36,28 @@ func (c *SyncClient) auth(req *http.Request) {
 	req.Header.Set("Content-Type", "application/json")
 }
 
+// enforceHTTPS refuses cleartext http to non-local hosts. Loopback over
+// http(s) and https anywhere are allowed.
+func enforceHTTPS(apiURL string) error {
+	u, err := url.Parse(apiURL)
+	if err != nil {
+		return nil
+	}
+	if u.Scheme != "http" {
+		return nil
+	}
+	host := u.Hostname()
+	if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+		return nil
+	}
+	return fmt.Errorf("refusing cleartext http to non-local host %q (use https or localhost)", host)
+}
+
 // Push uploads a snapshot.
 func (c *SyncClient) Push(projectID string, snapshot *versioning.ContextSnapshot) error {
+	if err := enforceHTTPS(c.apiURL); err != nil {
+		return err
+	}
 	body, err := json.Marshal(snapshot)
 	if err != nil {
 		return fmt.Errorf("marshal snapshot: %w", err)
@@ -61,6 +82,9 @@ func (c *SyncClient) Push(projectID string, snapshot *versioning.ContextSnapshot
 
 // Pull downloads the latest snapshot.
 func (c *SyncClient) Pull(projectID string) (*versioning.ContextSnapshot, error) {
+	if err := enforceHTTPS(c.apiURL); err != nil {
+		return nil, err
+	}
 	url := fmt.Sprintf("%s/api/v1/projects/%s/pull", c.apiURL, projectID)
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
@@ -85,6 +109,9 @@ func (c *SyncClient) Pull(projectID string) (*versioning.ContextSnapshot, error)
 
 // Login exchanges email/password for a token.
 func (c *SyncClient) Login(email, password string) (string, error) {
+	if err := enforceHTTPS(c.apiURL); err != nil {
+		return "", err
+	}
 	body, _ := json.Marshal(map[string]string{"email": email, "password": password})
 	url := c.apiURL + "/auth/login"
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
@@ -115,6 +142,9 @@ func (c *SyncClient) Login(email, password string) (string, error) {
 
 // CreateToken creates a share token.
 func (c *SyncClient) CreateToken(name string, readOnly bool) (string, error) {
+	if err := enforceHTTPS(c.apiURL); err != nil {
+		return "", err
+	}
 	body, _ := json.Marshal(map[string]any{"name": name, "read_only": readOnly})
 	url := c.apiURL + "/api/v1/tokens"
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
@@ -162,8 +192,11 @@ func SaveToken(token string) error {
 	return os.WriteFile(path, data, 0o600)
 }
 
-// LoadToken loads token.
+// LoadToken loads token. CTX_TOKEN env var takes highest precedence.
 func LoadToken() string {
+	if tok := os.Getenv("CTX_TOKEN"); tok != "" {
+		return tok
+	}
 	path, err := CredentialsPath()
 	if err != nil {
 		return ""

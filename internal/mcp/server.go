@@ -2,9 +2,13 @@ package mcp
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"regexp"
 	"strings"
+	"time"
 
 	projctx "github.com/AnshGajera/CTX/internal/context"
 	"github.com/AnshGajera/CTX/internal/versioning"
@@ -15,11 +19,25 @@ type MCPServer struct {
 	store *versioning.ContextStore
 	root  string
 	port  int
+	bind  string
 }
+
+// maxBodyBytes caps JSON request bodies (5 MiB).
+const maxBodyBytes = 5 << 20
+
+// snapshotRefRe allowlists handleDiff refs (HEAD, HEAD~N, or hex hashes).
+var snapshotRefRe = regexp.MustCompile(`^(HEAD(~\d+)?|[0-9a-fA-F]{7,64})$`)
 
 // NewMCPServer creates a server.
 func NewMCPServer(root string, store *versioning.ContextStore, port int) *MCPServer {
-	return &MCPServer{root: root, store: store, port: port}
+	return &MCPServer{root: root, store: store, port: port, bind: "127.0.0.1"}
+}
+
+// SetBind overrides the listen address (default "127.0.0.1").
+func (s *MCPServer) SetBind(bind string) {
+	if strings.TrimSpace(bind) != "" {
+		s.bind = bind
+	}
 }
 
 func (s *MCPServer) loadHead() (*projctx.ProjectContext, error) {
@@ -148,7 +166,14 @@ func (s *MCPServer) Handler() http.Handler {
 			TaskDescription string   `json:"task_description"`
 			AffectedFiles   []string `json:"affected_files"`
 		}
-		_ = json.NewDecoder(r.Body).Decode(&req)
+		r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			var mbe *http.MaxBytesError
+			if errors.As(err, &mbe) {
+				http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
+				return
+			}
+		}
 		ctx, err := s.loadHead()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusNotFound)
@@ -160,7 +185,14 @@ func (s *MCPServer) Handler() http.Handler {
 		var req struct {
 			FilePath string `json:"file_path"`
 		}
-		_ = json.NewDecoder(r.Body).Decode(&req)
+		r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			var mbe *http.MaxBytesError
+			if errors.As(err, &mbe) {
+				http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
+				return
+			}
+		}
 		if req.FilePath == "" {
 			req.FilePath = r.URL.Query().Get("file_path")
 		}
@@ -176,8 +208,20 @@ func (s *MCPServer) Handler() http.Handler {
 
 // Start runs the HTTP server.
 func (s *MCPServer) Start() error {
-	addr := fmt.Sprintf(":%d", s.port)
-	return http.ListenAndServe(addr, s.Handler()) //nolint:gosec
+	bind := s.bind
+	if strings.TrimSpace(bind) == "" {
+		bind = "127.0.0.1"
+	}
+	addr := fmt.Sprintf("%s:%d", bind, s.port)
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           s.Handler(),
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
+	return srv.ListenAndServe()
 }
 
 func (s *MCPServer) handleToolCall(w http.ResponseWriter, r *http.Request) {
@@ -185,7 +229,18 @@ func (s *MCPServer) handleToolCall(w http.ResponseWriter, r *http.Request) {
 		Name      string         `json:"name"`
 		Arguments map[string]any `json:"arguments"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
+	data, err := io.ReadAll(r.Body)
+	if err != nil {
+		var mbe *http.MaxBytesError
+		if errors.As(err, &mbe) {
+			http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
+			return
+		}
+		http.Error(w, "bad request: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := json.Unmarshal(data, &req); err != nil {
 		http.Error(w, "bad request: "+err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -195,7 +250,12 @@ func (s *MCPServer) handleToolCall(w http.ResponseWriter, r *http.Request) {
 			Tool   string         `json:"tool"`
 			Params map[string]any `json:"params"`
 		}
-		_ = alt
+		if err := json.Unmarshal(data, &alt); err == nil && alt.Tool != "" {
+			req.Name = alt.Tool
+			if req.Arguments == nil {
+				req.Arguments = alt.Params
+			}
+		}
 	}
 	ctx, err := s.loadHead()
 	if err != nil {
@@ -248,6 +308,10 @@ func (s *MCPServer) handleDiff(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		from = cur.ParentHash
+	}
+	if !snapshotRefRe.MatchString(from) || !snapshotRefRe.MatchString(to) {
+		http.Error(w, "invalid ref: must be HEAD, HEAD~N, or a hex hash", http.StatusBadRequest)
+		return
 	}
 	s1, err := s.store.LoadSnapshot(from)
 	if err != nil {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/AnshGajera/CTX/internal/cache"
@@ -192,7 +193,23 @@ func installPostCommitHook(root string, verbose bool) {
 		return
 	}
 	hook := filepath.Join(hookDir, "post-commit")
-	content := "#!/bin/sh\nctx extract --quiet --on-commit &\n"
+	hookLine := "ctx extract --quiet --on-commit &"
+	if data, err := os.ReadFile(hook); err == nil {
+		if strings.Contains(string(data), "ctx extract") {
+			return
+		}
+		out := string(data)
+		if len(out) > 0 && !strings.HasSuffix(out, "\n") {
+			out += "\n"
+		}
+		out += hookLine + "\n"
+		_ = os.WriteFile(hook, []byte(out), 0o755)
+		if verbose {
+			fmt.Println("Installed post-commit hook")
+		}
+		return
+	}
+	content := "#!/bin/sh\n" + hookLine + "\n"
 	_ = os.WriteFile(hook, []byte(content), 0o755)
 	if verbose {
 		fmt.Println("Installed post-commit hook")
@@ -275,7 +292,11 @@ func runExtract(root string, quiet, onCommit bool, sections []string) (bool, err
 	if err != nil {
 		return false, fmt.Errorf("not initialized (run ctx init): %w", err)
 	}
-	cfg, _ := config.Load(config.ProjectConfigPath(root))
+	cfg, cfgErr := config.Load(config.ProjectConfigPath(root))
+	if cfgErr != nil {
+		color.Yellow("Warning: could not load config, using defaults: %v", cfgErr)
+		cfg = config.Default()
+	}
 	// Incremental fast path: tree unchanged → refresh git state only.
 	if !onCommit {
 		if deduped, handled, herr := tryFastRefresh(root, cfg); herr == nil && handled {

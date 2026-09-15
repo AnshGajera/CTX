@@ -24,15 +24,15 @@ func (e *NextJSExtractor) Extract(ctx *projctx.ProjectContext) error {
 	var endpoints []projctx.APIEndpoint
 	appAPI := filepath.Join(e.Root, "app", "api")
 	if _, err := os.Stat(appAPI); err == nil {
-		_ = filepath.Walk(appAPI, func(p string, info os.FileInfo, err error) error {
-			if err != nil || info.IsDir() {
+		_ = e.WalkFiles(func(p, rel string, info os.FileInfo) error {
+			slash := filepath.ToSlash(rel)
+			if !strings.HasPrefix(slash, "app/api/") {
 				return nil
 			}
 			base := filepath.Base(p)
 			if base != "route.ts" && base != "route.js" && base != "route.tsx" {
 				return nil
 			}
-			rel, _ := filepath.Rel(e.Root, p)
 			apiPath := appRouteToPath(rel)
 			data, _ := os.ReadFile(p)
 			methods := reExportedMethod.FindAllStringSubmatch(string(data), -1)
@@ -53,15 +53,15 @@ func (e *NextJSExtractor) Extract(ctx *projctx.ProjectContext) error {
 	// Pages router: pages/api/**/*.ts|js
 	pagesAPI := filepath.Join(e.Root, "pages", "api")
 	if _, err := os.Stat(pagesAPI); err == nil {
-		_ = filepath.Walk(pagesAPI, func(p string, info os.FileInfo, err error) error {
-			if err != nil || info.IsDir() {
+		_ = e.WalkFiles(func(p, rel string, info os.FileInfo) error {
+			slash := filepath.ToSlash(rel)
+			if !strings.HasPrefix(slash, "pages/api/") {
 				return nil
 			}
 			ext := filepath.Ext(p)
 			if ext != ".ts" && ext != ".js" && ext != ".tsx" {
 				return nil
 			}
-			rel, _ := filepath.Rel(e.Root, p)
 			apiPath := pagesRouteToPath(rel)
 			endpoints = append(endpoints, projctx.APIEndpoint{
 				Method: "ALL", Path: apiPath, File: filepath.ToSlash(rel),

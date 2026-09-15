@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	projctx "github.com/AnshGajera/CTX/internal/context"
@@ -77,6 +78,61 @@ func (w *Watcher) Watch(ctx context.Context) error {
 	}
 	var pending bool
 
+	var mu sync.Mutex
+	var extracting bool
+	var extractPending bool
+
+	extractOnce := func() {
+		fmt.Println("Change detected, re-extracting...")
+		newCtx, err := w.engine.Extract()
+		if err != nil {
+			fmt.Printf("re-extract failed: %v\n", err)
+			return
+		}
+		ctxDir := filepath.Join(w.root, ".ctx")
+		if err := newCtx.Save(ctxDir); err != nil {
+			fmt.Printf("save failed: %v\n", err)
+			return
+		}
+		fmt.Printf("Re-extracted: %d endpoints, %d models\n",
+			countEndpoints(newCtx), countModels(newCtx))
+		if w.autoPush {
+			if _, deduped, err := w.store.Commit(newCtx, "watch: auto-update"); err != nil {
+				fmt.Printf("auto-commit failed: %v\n", err)
+			} else if deduped {
+				fmt.Println("No changes — snapshot not duplicated")
+			} else {
+				fmt.Println("Auto-committed snapshot")
+			}
+		}
+	}
+
+	runExtract := func() {
+		for {
+			extractOnce()
+			mu.Lock()
+			if !extractPending {
+				extracting = false
+				mu.Unlock()
+				return
+			}
+			extractPending = false
+			mu.Unlock()
+		}
+	}
+
+	triggerExtract := func() {
+		mu.Lock()
+		if extracting {
+			extractPending = true
+			mu.Unlock()
+			return
+		}
+		extracting = true
+		mu.Unlock()
+		go runExtract()
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -94,6 +150,12 @@ func (w *Watcher) Watch(ctx context.Context) error {
 				continue
 			}
 			pending = true
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
 			timer.Reset(w.debounce)
 		case err, ok := <-watcher.Errors:
 			if !ok {
@@ -105,28 +167,7 @@ func (w *Watcher) Watch(ctx context.Context) error {
 				continue
 			}
 			pending = false
-			fmt.Println("Change detected, re-extracting...")
-			newCtx, err := w.engine.Extract()
-			if err != nil {
-				fmt.Printf("re-extract failed: %v\n", err)
-				continue
-			}
-			ctxDir := filepath.Join(w.root, ".ctx")
-			if err := newCtx.Save(ctxDir); err != nil {
-				fmt.Printf("save failed: %v\n", err)
-				continue
-			}
-			fmt.Printf("Re-extracted: %d endpoints, %d models\n",
-				countEndpoints(newCtx), countModels(newCtx))
-			if w.autoPush {
-				if _, deduped, err := w.store.Commit(newCtx, "watch: auto-update"); err != nil {
-					fmt.Printf("auto-commit failed: %v\n", err)
-				} else if deduped {
-					fmt.Println("No changes — snapshot not duplicated")
-				} else {
-					fmt.Println("Auto-committed snapshot")
-				}
-			}
+			triggerExtract()
 		}
 	}
 }

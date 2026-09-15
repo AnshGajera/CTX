@@ -6,7 +6,7 @@ import os
 from collections import Counter
 from typing import Any, Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 try:
@@ -72,8 +72,11 @@ def chunk(req: ChunkRequest) -> dict[str, Any]:
 
 @app.post("/search")
 def search(req: SearchRequest) -> dict[str, Any]:
+    if len(req.chunks) > 20000:
+        raise HTTPException(status_code=413, detail="too many chunks (max 20000)")
+    top_k = max(1, min(int(req.top_k), 50))
     model = get_model()
-    texts = [c.text for c in req.chunks]
+    texts = [(c.text or "")[:20000] for c in req.chunks]
     if model is not None and texts:
         try:
             import numpy as np  # type: ignore
@@ -81,12 +84,13 @@ def search(req: SearchRequest) -> dict[str, Any]:
             q = model.encode([req.query], normalize_embeddings=True)
             d = model.encode(texts, normalize_embeddings=True)
             sims = (d @ q[0]).tolist()
-            ranked = sorted(zip(req.chunks, sims), key=lambda x: x[1], reverse=True)[: req.top_k]
-            return {"results": [{"text": c.text, "source": c.source or "", "score": float(s)} for c, s in ranked], "backend": "minilm"}
+            ranked = sorted(zip(req.chunks, sims), key=lambda x: x[1], reverse=True)[:top_k]
+            return {"results": [{"text": (c.text or "")[:20000], "source": c.source or "", "score": float(s)} for c, s in ranked], "backend": "minilm"}
         except Exception:
             pass
     # TF-IDF fallback (also used for offline eval parity with Go)
-    ranked = tfidf_rank(req.query, [c.model_dump() for c in req.chunks], req.top_k)
+    truncated = [{**c.model_dump(), "text": (c.text or "")[:20000]} for c in req.chunks]
+    ranked = tfidf_rank(req.query, truncated, top_k)
     return {"results": ranked, "backend": "tfidf"}
 
 

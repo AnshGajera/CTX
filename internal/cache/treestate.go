@@ -22,17 +22,34 @@ type TreeState struct {
 	SavedAt time.Time `json:"saved_at"`
 }
 
-// ComputeTreeHash hashes sorted "rel:size:mtime" entries using the same
-// skip/ignore rules as the extractors.
+// ComputeTreeHash hashes sorted "rel:size:content" entries using the same
+// skip/ignore rules as the extractors. Content (not mtime) is hashed so
+// same-size edits with preserved timestamps cannot fool the fast path.
+// Files larger than maxContentHashBytes hash size + mtime + first/last
+// sample instead of full content. Extractor inputs outside the walk
+// (.ctxignore, .ctx/config.toml) are folded in so config changes invalidate.
 func ComputeTreeHash(root string) (string, error) {
 	base := extractors.NewBase(root)
 	var entries []string
 	err := base.WalkFiles(func(path, rel string, info os.FileInfo) error {
-		entries = append(entries, fmt.Sprintf("%s:%d:%d", rel, info.Size(), info.ModTime().UnixNano()))
+		sum, herr := hashFileContent(path, info)
+		if herr != nil {
+			// Unreadable file: fall back to size+mtime so one bad file
+			// never aborts the fast-path decision.
+			sum = fmt.Sprintf("unreadable:%d:%d", info.Size(), info.ModTime().UnixNano())
+		}
+		entries = append(entries, rel+"\x00"+sum)
 		return nil
 	})
 	if err != nil {
 		return "", err
+	}
+	// Fold extractor inputs that live outside the walked set.
+	for _, extra := range []string{".ctxignore", filepath.Join(".ctx", "config.toml")} {
+		if data, rerr := os.ReadFile(filepath.Join(root, extra)); rerr == nil {
+			sum := sha256.Sum256(data)
+			entries = append(entries, extra+"\x00"+hex.EncodeToString(sum[:]))
+		}
 	}
 	sort.Strings(entries)
 	h := sha256.New()
@@ -40,6 +57,44 @@ func ComputeTreeHash(root string) (string, error) {
 		h.Write([]byte(e + "\n"))
 	}
 	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+// maxContentHashBytes bounds full-content hashing per file.
+const maxContentHashBytes = 2 << 20
+
+// sampleBytes bounds head/tail sampling for oversized files.
+const sampleBytes = 64 << 10
+
+func hashFileContent(path string, info os.FileInfo) (string, error) {
+	if info.Size() > maxContentHashBytes {
+		f, err := os.Open(path)
+		if err != nil {
+			return "", err
+		}
+		defer f.Close()
+		h := sha256.New()
+		head := make([]byte, sampleBytes)
+		n, _ := f.Read(head)
+		h.Write(head[:n])
+		if info.Size() > sampleBytes {
+			off := info.Size() - sampleBytes
+			if off < int64(n) {
+				off = int64(n)
+			}
+			tail := make([]byte, sampleBytes)
+			if _, serr := f.ReadAt(tail, off); serr == nil {
+				h.Write(tail)
+			}
+		}
+		fmt.Fprintf(h, ":%d:%d", info.Size(), info.ModTime().UnixNano())
+		return "sample:" + hex.EncodeToString(h.Sum(nil)), nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(data)
+	return fmt.Sprintf("%d:%s", info.Size(), hex.EncodeToString(sum[:])), nil
 }
 
 func statePath(ctxDir string) string {

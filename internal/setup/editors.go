@@ -83,17 +83,24 @@ func writeMerged(path, topKey, root string) (string, error) {
 		if err := json.Unmarshal(data, &doc); err != nil {
 			return "", fmt.Errorf("parse existing %s: %w", path, err)
 		}
+		// Back up the original config, preserving the first version.
+		if _, statErr := os.Stat(path + ".bak"); os.IsNotExist(statErr) {
+			_ = os.WriteFile(path+".bak", data, 0o644)
+		}
 	}
 	servers, ok := doc[topKey].(map[string]any)
 	if !ok {
 		servers = map[string]any{}
 	}
-	entry := serverEntry(root)
-	// VS Code convention carries an explicit stdio type.
-	if topKey == "servers" {
-		entry["type"] = "stdio"
+	// Preserve an existing ctx entry instead of overwriting it.
+	if _, exists := servers["ctx"]; !exists {
+		entry := serverEntry(root)
+		// VS Code convention carries an explicit stdio type.
+		if topKey == "servers" {
+			entry["type"] = "stdio"
+		}
+		servers["ctx"] = entry
 	}
-	servers["ctx"] = entry
 	doc[topKey] = servers
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return "", err

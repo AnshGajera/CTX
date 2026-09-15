@@ -30,6 +30,10 @@ if (-not $asset) {
   exit 1
 }
 $checksums = $rel.assets | Where-Object { $_.name -match 'checksum' } | Select-Object -First 1
+if (-not $checksums) {
+  Write-Error "Checksum asset not found in $Version; refusing to install unverified binary."
+  exit 1
+}
 Write-Host "Asset: $($asset.name)"
 
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ("ctx-install-" + [Guid]::NewGuid().ToString("N"))

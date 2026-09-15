@@ -34,6 +34,9 @@ func (e *GoAPIExtractor) Extract(ctx *projctx.ProjectContext) error {
 		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 			return nil
 		}
+		if info.Size() > 1_000_000 {
+			return nil
+		}
 		f, err := os.Open(path)
 		if err != nil {
 			return nil

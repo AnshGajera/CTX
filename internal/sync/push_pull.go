@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 
+	projctx "github.com/AnshGajera/CTX/internal/context"
 	"github.com/AnshGajera/CTX/internal/versioning"
 )
 
@@ -32,6 +34,21 @@ func PullSnapshot(client *SyncClient, store *versioning.ContextStore, ctxDir, pr
 	snap, err := client.Pull(projectID)
 	if err != nil {
 		return nil, err
+	}
+	// Validate server-provided snapshot before writing anything.
+	if ok, _ := regexp.MatchString(`^[0-9a-f]{32}$`, snap.Hash); !ok {
+		return nil, fmt.Errorf("invalid snapshot hash %q", snap.Hash)
+	}
+	var decoded projctx.ProjectContext
+	if err := json.Unmarshal(snap.Context, &decoded); err != nil {
+		return nil, fmt.Errorf("invalid snapshot context: %w", err)
+	}
+	expected, err := versioning.CanonicalHash(&decoded)
+	if err != nil {
+		return nil, fmt.Errorf("hash snapshot context: %w", err)
+	}
+	if expected != snap.Hash {
+		return nil, fmt.Errorf("snapshot hash mismatch: got %q want %q", snap.Hash, expected)
 	}
 	// persist
 	if err := os.MkdirAll(filepath.Join(ctxDir, "snapshots"), 0o755); err != nil {

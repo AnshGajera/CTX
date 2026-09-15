@@ -140,10 +140,20 @@ func (e *PrismaExtractor) findSchema() string {
 	}
 	var found string
 	_ = filepath.Walk(e.Root, func(p string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() {
-			if err == nil && info.IsDir() && ShouldSkipDir(info.Name()) && p != e.Root {
+		if err != nil {
+			return nil
+		}
+		rel, _ := filepath.Rel(e.Root, p)
+		if info.IsDir() {
+			if p != e.Root && (ShouldSkipDir(info.Name()) || e.ShouldExclude(rel) || e.ShouldExclude(rel+"/")) {
 				return filepath.SkipDir
 			}
+			return nil
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return nil
+		}
+		if e.ShouldExclude(rel) {
 			return nil
 		}
 		if filepath.Base(p) == "schema.prisma" {

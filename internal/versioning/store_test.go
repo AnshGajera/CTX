@@ -53,7 +53,13 @@ func TestCommitCustomMessageAlwaysSnapshots(t *testing.T) {
 	if _, _, err := store.Commit(ctx, "extract"); err != nil {
 		t.Fatal(err)
 	}
-	if _, deduped, err := store.Commit(ctx, "release checkpoint"); err != nil || deduped {
-		t.Fatalf("custom message must snapshot: %v deduped=%v", err, deduped)
+	// Identical content never forks history, whatever the message.
+	if _, deduped, err := store.Commit(ctx, "release checkpoint"); err != nil || !deduped {
+		t.Fatalf("identical content must dedupe: %v deduped=%v", err, deduped)
+	}
+	// Changed content with a custom message snapshots.
+	ctx2 := &projctx.ProjectContext{Version: 1, ProjectName: "y"}
+	if _, deduped, err := store.Commit(ctx2, "release checkpoint"); err != nil || deduped {
+		t.Fatalf("changed content must snapshot: %v deduped=%v", err, deduped)
 	}
 }

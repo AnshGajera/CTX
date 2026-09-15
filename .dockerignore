@@ -1,0 +1,6 @@
+.git/
+dist/
+.ctx/
+__pycache__/
+*.exe
+node_modules/

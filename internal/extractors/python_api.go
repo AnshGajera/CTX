@@ -41,6 +41,9 @@ func (e *PythonAPIExtractor) Extract(ctx *projctx.ProjectContext) error {
 		if !strings.HasSuffix(path, ".py") || isTestPython(rel) {
 			return nil
 		}
+		if info.Size() > 1_000_000 {
+			return nil
+		}
 		f, err := os.Open(path)
 		if err != nil {
 			return nil

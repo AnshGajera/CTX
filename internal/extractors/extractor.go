@@ -80,6 +80,13 @@ func (b Base) WalkFiles(fn func(path, rel string, info os.FileInfo) error) error
 			if p != b.Root && ShouldSkipDir(info.Name()) {
 				return filepath.SkipDir
 			}
+			if p != b.Root && (info.Mode()&os.ModeSymlink != 0 ||
+				b.ShouldExclude(rel) || b.ShouldExclude(rel+"/")) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
 			return nil
 		}
 		if b.ShouldExclude(rel) {

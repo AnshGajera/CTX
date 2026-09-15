@@ -59,15 +59,20 @@ func RankTFIDF(chunks []Chunk, query string, topK int) []RankedChunk {
 		if qNorm > 0 && dNorm > 0 {
 			score = dot / (math.Sqrt(qNorm) * math.Sqrt(dNorm))
 		}
-		// small boost for kind matches
-		q := strings.ToLower(query)
+		// small boost for whole-token kind matches
 		kind := strings.ToLower(c.Kind)
-		if strings.Contains(q, kind) {
-			score += 0.05
+		for _, tok := range toks {
+			if tok == kind {
+				score += 0.05
+				break
+			}
 		}
 		scored = append(scored, RankedChunk{Chunk: c, Score: score})
 	}
 	sort.Slice(scored, func(i, j int) bool { return scored[i].Score > scored[j].Score })
+	if len(scored) > 0 && scored[0].Score <= 0 {
+		return nil
+	}
 	if topK > 0 && len(scored) > topK {
 		scored = scored[:topK]
 	}
