@@ -1,6 +1,6 @@
 # CTX — Context Engine for Software Development
 
-> Git for Context, not Code. Extract structured project context (architecture, APIs, DB schemas, deps, env, patterns) and serve it to AI tools via MCP. Hybrid TF-IDF + MiniLM retrieval for RAG.
+> Git for Context, not Code. Extract structured project context (architecture, APIs, DB schemas, deps, env, patterns) and serve it to AI tools via MCP. Hybrid TF-IDF + MiniLM retrieval for RAG. Local dashboard, health scoring, and a self-hosted team server included.
 
 ## Install
 
@@ -19,13 +19,15 @@ go build -o ctx ./cmd/ctx
 ctx init       # interactive wizard: banner, project name, section toggles, MCP editor setup
 ctx extract
 ctx status
+ctx health     # context quality score (0-100) with tips
 ctx search "auth flow"
 ctx export --format openapi -o openapi.json
-ctx serve --port 3100        # HTTP REST API
-ctx serve --stdio            # MCP for Cursor / Claude Desktop / VS Code
+ctx serve --ui             # dashboard at http://127.0.0.1:3100/ui
+ctx serve --stdio          # MCP for Cursor / Claude Desktop / VS Code
+ctx dashboard              # terminal task menu (extract/search/diff/history/serve/export)
 ```
 
-Non-interactive (CI/scripts): `ctx init --yes` skips the wizard; `--editor cursor|claude-desktop|vscode|none` and `--sections api_endpoints` preselect wizard answers. `--json` on init/extract/status/diff/log/search/eval gives machine-readable output.
+Non-interactive (CI/scripts): `ctx init --yes` skips the wizard; `--editor cursor|claude-desktop|vscode|none` and `--sections api_endpoints` preselect wizard answers. `--json` on init/extract/status/diff/log/search/eval/health gives machine-readable output.
 
 ## Commands
 
@@ -39,10 +41,11 @@ Non-interactive (CI/scripts): `ctx init --yes` skips the wizard; `--editor curso
 | `ctx search <q>` | Hybrid semantic search over context |
 | `ctx eval` | Retrieval `hit@k` self-eval |
 | `ctx health` | Context quality score (0-100) with tips |
+| `ctx dashboard` | Terminal task menu (extract/search/diff/history/serve/export) |
 | `ctx export --format openapi` | Export endpoints as OpenAPI 3.0 |
-| `ctx serve` | MCP server (HTTP + stdio) |
-| `ctx watch` | File watcher with debounce |
-| `ctx push/pull/share/login` | [preview] Cloud sync — needs ctx backend; local-first otherwise |
+| `ctx serve [--ui] [--bind]` | MCP server (HTTP + stdio) + embedded web dashboard |
+| `ctx watch` | File watcher with debounce (single-flight re-extract) |
+| `ctx push/pull/share/login` | Team sync via `ctx-server` (self-hosted, JWT) |
 
 ## MCP integration (stdio-first)
 
@@ -54,11 +57,17 @@ Non-interactive (CI/scripts): `ctx init --yes` skips the wizard; `--editor curso
 
 `ctx init` can write this for you: choose `cursor` (writes `.cursor/mcp.json`), `vscode` (writes `.vscode/mcp.json`), or `claude-desktop` (merges into the Claude Desktop user config, preserving your other servers).
 
-**HTTP mode** (`ctx serve --port 3100`) is a plain REST API for scripts and debugging (`/context`, `/context/apis`, `/mcp/tools/*`) — it is *not* the MCP Streamable HTTP protocol, so point MCP clients at stdio.
+**HTTP mode** (`ctx serve --port 3100`) is a plain REST API for scripts and debugging (`/context`, `/context/apis`, `/mcp/tools/*`) — it is *not* the MCP Streamable HTTP protocol, so point MCP clients at stdio. Binds `127.0.0.1` by default (`--bind 0.0.0.0` only on trusted networks), with server timeouts and 5MB body caps.
 
 Tools: `get_project_context` (supports `sections`, `max_tokens`), `get_context_for_task`, `get_context_for_file`, `get_api_endpoints`, `get_database_schema`, `get_project_conventions`, `get_env_requirements`, `search_context`.
 
 Tip: `GET /context?max_tokens=4000` returns budget-truncated context (least-important sections dropped first) so large repos fit model windows.
+
+## Dashboard + health + freshness
+
+`ctx serve --ui` serves an offline single-page dashboard at `/ui` (overview, endpoint table with filters, schema + ER diagram, env, deps, history/diff timeline, search box). Extra API for scripts: `/api/history`, `/api/diff?from=&to=` (hash allowlisted), `/api/search?q=`.
+
+`ctx health` scores context 0–100 (grade A–D): endpoint docs, architecture pattern, DB diagram, env descriptions, business rules, freshness, patterns, key files, deps, structure, model fields — with `💡` tips. Every extracted section carries `section_meta` provenance (`source: regex|ast|regex+ast`, `confidence`, `extractors`, `item_count`) and staleness (`fresh` <1d, `stale` <7d, `expired` beyond), also exposed in `/context/summary` so AI agents can prefer fresh context.
 
 ## Supported stack matrix
 
@@ -66,6 +75,7 @@ Tip: `GET /context?max_tokens=4000` returns budget-truncated context (least-impo
 |---|---|
 | Languages | TypeScript/JavaScript, Go, Python, Rust, Java/Kotlin (detection); TS/JS, Go, Python (route extraction) |
 | Frameworks | Next.js (App + Pages router), Express/Fastify/Hono, Gin/Echo/Fiber/Chi/Mux, Flask/FastAPI/Django |
+| APIs | REST route extraction + GraphQL schema/queries/mutations/subscriptions (`.graphql`/`.gql`) |
 | Database | Prisma (full schema + ER diagram), Mongoose, TypeORM, SQLAlchemy, Django ORM, GORM, plus migration files |
 | Env | `.env.example` + code refs (`process.env`, `os.getenv`, …) + compose + Dockerfile; values never stored |
 | Precision mode | `ctx-ml` sidecar: Python `ast` + tree-sitter TS route extraction merges what regex missed |
@@ -80,15 +90,26 @@ uvicorn ctx-ml.app:app --port 8001
 python ctx-ml/eval.py .ctx/context.json 5
 ```
 
-Uses `sentence-transformers/all-MiniLM-L6-v2` when installed, TF-IDF fallback otherwise (Go and Python rankers are parity-tested). `ctx extract` auto-merges sidecar AST routes when the sidecar is reachable; offline it silently falls back to regex extractors.
+Uses `sentence-transformers/all-MiniLM-L6-v2` when installed, TF-IDF fallback otherwise (Go and Python rankers are parity-tested). `ctx extract` auto-merges sidecar AST routes when the sidecar is reachable; offline it silently falls back to regex extractors. Sidecar guards: `top_k` clamped to 1–50, 413 over 20k chunks, 1MB/20k-file scan caps.
+
+## Team server (`server/`)
+
+Self-hosted sync backend (SQLite + JWT, defaults `127.0.0.1:3200`):
+
+```bash
+go run ./server/cmd/ctx-server --help   # -bind/-port/-db/-jwt-secret, or CTX_* env
+# or: docker compose up ctx-server      # :3200 with /data volume
+```
+
+Point the CLI at it via `core.api_url`, then `ctx login` (`--token` skips the echoing password prompt; `CTX_TOKEN` env also works), `ctx push/pull`, `ctx share --create-token`. Orgs/projects/history/share/token endpoints live under `/api/v1/*` (60 req/min + burst 10, 10MiB/100-snapshot caps). Pulled snapshots are hash-verified before touching disk.
 
 ## Privacy
 
-Never stores `.env` values — only names, categories, required flags. Sensitive defaults redacted (`[REDACTED]`). `.ctxignore` supports gitignore-style patterns (`*.log`, `secrets/`, `**`, `!` negation).
+Never stores `.env` values — only names, categories, required flags. Sensitive defaults redacted (`[REDACTED]`), plus entropy + known-pattern scanning of free text (TODOs, examples, rule/descriptions) and secret-looking values under generic names. HTTPS enforced for non-local `api_url`. `.ctxignore` supports gitignore-style patterns (`*.log`, `secrets/`, `**`, `!` negation) and prunes whole ignored directories.
 
 ## Config (`~/.config/ctx/config.toml` + `.ctx/config.toml`)
 
-`core.api_url/ml_url`, `extraction.*` toggles, `privacy.*`, `sync.*`.
+`core.api_url/ml_url`, `extraction.*` toggles, `privacy.*`, `sync.*`. `ml_url = ""` disables the sidecar. Installers verify release checksums and abort when missing.
 
 ## Troubleshooting
 
@@ -98,10 +119,12 @@ Never stores `.env` values — only names, categories, required flags. Sensitive
 | `ctx diff` → `no parent at HEAD~1` | Only one snapshot exists; run `ctx extract` after changing code |
 | `search` returns nothing | Run `ctx extract` first; check `.ctx/context.json` exists |
 | `extract` always says "No changes" | Correct — snapshots dedupe on identical content; edit code to get a new snapshot |
-| MCP `serve` port in use | `ctx serve --port 3200` |
+| MCP `serve` port in use | `ctx serve --port 3200` (server binds `127.0.0.1`; `--bind` to change) |
+| `ctx health` score low | Follow the `💡` tips (docs, `.env.example` comments, `docs/decisions/` ADRs) |
+| `ctx login` password echoes | Expected (no masking) — prefer `ctx login --token` or `CTX_TOKEN` |
 | Sidecar AST adds nothing | Start it (`uvicorn ctx-ml.app:app --port 8001`); Go falls back silently when down |
 | `go: no required module` | Module is `github.com/AnshGajera/CTX`; run `go mod tidy` |
 
 ## Contributing / License
 
-MIT. See `Makefile` (`build/test/lint/release`). Run `go test ./...` and `python -m pytest ctx-ml/tests` before PRs.
+MIT. See `Makefile` (`build/test/test-go/test-python/lint/release`). Run `go test ./...` and `python -m pytest ctx-ml/tests` before PRs. See `CONTRIBUTING.md` and `SECURITY.md`.
