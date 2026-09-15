@@ -3,25 +3,44 @@ on:
   push:
     branches: [main, master]
   pull_request:
+
 jobs:
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: ["1.24"]
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.22"
+          go-version: ${{ matrix.go-version }}
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+
       - name: Build
         run: go build ./...
+
       - name: Build binary
         run: go build -o /tmp/ctx-test ./cmd/ctx && /tmp/ctx-test --help
+
       - name: Test Go
-        run: go test ./...
+        run: go test ./... -race -coverprofile=coverage.out
+
       - name: Vet
         run: go vet ./...
+
+      - name: Upload coverage
+        if: matrix.go-version == '1.24'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.out
+
       - name: Test Python
         run: |
           pip install -r ctx-ml/requirements.txt

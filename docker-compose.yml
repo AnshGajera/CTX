@@ -1,7 +1,24 @@
 services:
+  ctx-server:
+    build: ./server
+    ports:
+      - "3200:3200"
+    environment:
+      - CTX_DB=/data/ctx-server.db
+      - CTX_BIND=0.0.0.0
+      - CTX_PORT=3200
+      - CTX_JWT_SECRET=${CTX_JWT_SECRET:-change-me-in-production}
+    volumes:
+      - ctx-data:/data
+    restart: unless-stopped
+
   ctx-ml:
     build: ./ctx-ml
     ports:
       - "8001:8001"
     environment:
       - CTX_EMBED_MODEL=all-MiniLM-L6-v2
+    restart: unless-stopped
+
+volumes:
+  ctx-data:

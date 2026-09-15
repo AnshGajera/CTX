@@ -1,9 +1,52 @@
+# Build artifacts
 /ctx
 /ctx.exe
-.ctx/
+/ctx-*
 dist/
+stage/
+
+# CTX local data
+.ctx/
+
+# Python
 __pycache__/
 *.pyc
+*.pyo
+*.egg-info/
 .venv/
+venv/
+*.whl
+
+# Dependencies
 node_modules/
+vendor/
+
+# Environment & secrets
 .env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Test & coverage
+coverage/
+*.cover
+*.out
+htmlcov/
+.pytest_cache/
+
+# Misc
+*.log
+tmp/

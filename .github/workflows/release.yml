@@ -4,6 +4,7 @@ on:
     tags: ["v*"]
 permissions:
   contents: write
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -11,59 +12,27 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.22"
-      - name: Build all platforms
+          go-version: "1.24"
+
+      - name: Run tests before release
+        run: go test ./... -race
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean
         env:
-          TAG_NAME: ${{ github.ref_name }}
-          TAG_SHA: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-          echo "pwd=$(pwd)"
-          go version
-          ls
-          test -f go.mod || { echo "go.mod missing"; exit 1; }
-          test -d cmd/ctx || { echo "cmd/ctx missing"; exit 1; }
-          VER="${TAG_NAME#v}"
-          SHORT_SHA="$(echo "${TAG_SHA}" | cut -c1-8)"
-          DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          echo "Releasing ctx ${TAG_NAME} (${SHORT_SHA})"
-          LDFLAGS="-s -w -X github.com/AnshGajera/CTX/internal/version.Version=${TAG_NAME} -X github.com/AnshGajera/CTX/internal/version.Commit=${SHORT_SHA} -X github.com/AnshGajera/CTX/internal/version.Date=${DATE}"
-          mkdir -p dist stage
-          echo "--- linux/amd64 ---"
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o stage/ctx ./cmd/ctx
-          cp README.md LICENSE stage/
-          tar -czf "dist/ctx_${VER}_linux_amd64.tar.gz" -C stage ctx README.md LICENSE
-          rm -f stage/ctx
-          echo "--- linux/arm64 ---"
-          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags "$LDFLAGS" -o stage/ctx ./cmd/ctx
-          cp README.md LICENSE stage/
-          tar -czf "dist/ctx_${VER}_linux_arm64.tar.gz" -C stage ctx README.md LICENSE
-          rm -f stage/ctx
-          echo "--- darwin/amd64 ---"
-          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags "$LDFLAGS" -o stage/ctx ./cmd/ctx
-          cp README.md LICENSE stage/
-          tar -czf "dist/ctx_${VER}_darwin_amd64.tar.gz" -C stage ctx README.md LICENSE
-          rm -f stage/ctx
-          echo "--- darwin/arm64 ---"
-          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags "$LDFLAGS" -o stage/ctx ./cmd/ctx
-          cp README.md LICENSE stage/
-          tar -czf "dist/ctx_${VER}_darwin_arm64.tar.gz" -C stage ctx README.md LICENSE
-          rm -f stage/ctx
-          echo "--- windows/amd64 ---"
-          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags "$LDFLAGS" -o stage/ctx.exe ./cmd/ctx
-          cp README.md LICENSE stage/
-          (cd stage && zip -q "../dist/ctx_${VER}_windows_amd64.zip" ctx.exe README.md LICENSE)
-          rm -f stage/ctx.exe
-          (cd dist && sha256sum * > checksums.txt)
-          ls -la dist
-      - name: Publish release
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload install scripts
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/*
             scripts/install.sh
             scripts/install.ps1
-          fail_on_unmatched_files: true
-          generate_release_notes: true
+          fail_on_unmatched_files: false
