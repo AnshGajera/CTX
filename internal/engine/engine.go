@@ -106,6 +106,7 @@ func NewExtractionEngine(root string, profile *projctx.ProjectProfile, mlURL str
 		if langs["python"] {
 			e.extractors = append(e.extractors, extractors.NewPythonAPI(root))
 		}
+		e.extractors = append(e.extractors, extractors.NewGraphQL(root))
 		// AST precision pass: merges only endpoints regex missed.
 		e.extractors = append(e.extractors, extractors.NewSidecarAST(root, mlURL))
 	}

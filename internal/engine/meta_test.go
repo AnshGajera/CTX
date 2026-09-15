@@ -27,7 +27,7 @@ func TestStampSectionMeta(t *testing.T) {
 		stubExtractor{"sidecar-ast"},
 		stubExtractor{"prisma"},
 	}
-	stampSectionMeta(ctx, ex, []string{"", "", "boom"})
+	stampSectionMeta(ctx, ex, []string{"", "boom", "boom"})
 	if ctx.SectionMeta == nil {
 		t.Fatal("expected section meta")
 	}
