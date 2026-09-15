@@ -38,6 +38,7 @@ Non-interactive (CI/scripts): `ctx init --yes` skips the wizard; `--editor curso
 | `ctx log` | Snapshot history |
 | `ctx search <q>` | Hybrid semantic search over context |
 | `ctx eval` | Retrieval `hit@k` self-eval |
+| `ctx health` | Context quality score (0-100) with tips |
 | `ctx export --format openapi` | Export endpoints as OpenAPI 3.0 |
 | `ctx serve` | MCP server (HTTP + stdio) |
 | `ctx watch` | File watcher with debounce |

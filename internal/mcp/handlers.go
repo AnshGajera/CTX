@@ -3,9 +3,11 @@ package mcp
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/AnshGajera/CTX/internal/ai"
 	projctx "github.com/AnshGajera/CTX/internal/context"
+	"github.com/AnshGajera/CTX/internal/health"
 )
 
 // DispatchTool executes a tool by name.
@@ -248,11 +250,15 @@ func Summarize(ctx *projctx.ProjectContext) any {
 	if ctx.Dependencies != nil {
 		nDeps = len(ctx.Dependencies.Direct) + len(ctx.Dependencies.Dev)
 	}
+	rep := health.Score(ctx)
 	return map[string]any{
 		"project": ctx.ProjectName, "type": ctx.Profile.ProjectType,
 		"languages": ctx.Profile.Languages, "frameworks": ctx.Profile.Frameworks,
 		"counts": map[string]int{"endpoints": nEP, "models": nModels, "env_vars": nEnv, "dependencies": nDeps},
 		"branch": ctx.CurrentStateBranch(), "hash": ctx.ContentHash,
+		"extracted_at": ctx.ExtractedAt.UTC().Format(time.RFC3339),
+		"staleness":    ctx.Staleness(time.Now()),
+		"health":       map[string]any{"score": rep.Score, "grade": rep.Grade},
 	}
 }
 

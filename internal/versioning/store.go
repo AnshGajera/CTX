@@ -51,6 +51,19 @@ func CanonicalHash(ctx *projctx.ProjectContext) (string, error) {
 	clone := *ctx
 	clone.ExtractedAt = time.Time{}
 	clone.ContentHash = ""
+	if clone.SectionMeta != nil {
+		meta := make(map[string]*projctx.SectionMeta, len(clone.SectionMeta))
+		for k, v := range clone.SectionMeta {
+			if v == nil {
+				continue
+			}
+			c := *v
+			c.ExtractedAt = time.Time{}
+			c.Staleness = ""
+			meta[k] = &c
+		}
+		clone.SectionMeta = meta
+	}
 	data, err := json.Marshal(clone)
 	if err != nil {
 		return "", err

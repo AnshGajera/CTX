@@ -34,6 +34,7 @@ a{color:var(--acc)}
 <span class="pill" id="p-project">…</span>
 <span class="pill" id="p-branch">…</span>
 <span class="pill" id="p-hash">…</span>
+<span class="pill" id="p-fresh">…</span>
 <span style="flex:1"></span>
 <button onclick="loadAll()">Refresh</button>
 <a href="/context" target="_blank"><button>JSON</button></a>
@@ -64,6 +65,7 @@ CACHE.summary=await j("/context/summary");
 $("#p-project").textContent=CACHE.summary.project||"?";
 $("#p-branch").textContent=CACHE.summary.branch||"no git";
 $("#p-hash").textContent=(CACHE.summary.hash||"").slice(0,12)||"no hash";
+const h=CACHE.summary.health||{};$("#p-fresh").textContent=(CACHE.summary.staleness||"?")+("score" in h?(" · "+h.score+"/100 "+(h.grade||"")):"");
 const c=CACHE.summary.counts||{};
 $("#cards").innerHTML=["endpoints","models","env_vars","dependencies"].map(k=>`<div class=card><b>${c[k]??"–"}</b><span>${k.replace("_"," ")}</span></div>`).join("");
 CACHE.ctx=await j("/context").catch(()=>null);

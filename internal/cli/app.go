@@ -33,6 +33,7 @@ func NewApp() *cli.App {
 			commands.EvalCommand(),
 			commands.ExportCommand(),
 			commands.DashboardCommand(),
+			commands.HealthCommand(),
 		},
 	}
 }

@@ -154,6 +154,9 @@ func (e *ExtractionEngine) Extract() (*projctx.ProjectContext, error) {
 		Profile:     profile,
 	}
 	mergePartials(ctx, partials)
+	// Stamp per-section provenance before hashing (timestamps are
+	// excluded from the canonical hash, so this never changes it).
+	stampSectionMeta(ctx, e.extractors, errs)
 	// Deterministic ordering: extractor output order and Go map
 	// iteration are random, so sort everything before hashing. Without
 	// this, identical code produces different hashes on every run.
@@ -173,6 +176,122 @@ func (e *ExtractionEngine) Extract() (*projctx.ProjectContext, error) {
 		return ctx, errors.Join(extractErrs...)
 	}
 	return ctx, nil
+}
+
+// sectionExtractors maps section meta keys to the extractor names that
+// can contribute to them. Kept in sync with NewExtractionEngine.
+var sectionExtractors = map[string][]string{
+	"architecture":   {"architecture", "patterns"},
+	"apis":           {"typescript-api", "express-api", "nextjs", "go-api", "python-api", "graphql", "sidecar-ast"},
+	"database":       {"prisma", "generic-models"},
+	"dependencies":   {"dependencies"},
+	"business_rules": {"patterns"},
+	"environment":    {"environment"},
+	"file_structure": {"file-structure"},
+	"current_state":  {"git-state", "todo"},
+}
+
+// stampSectionMeta records per-section provenance: which extractors ran,
+// which failed, and the resulting confidence (share of successes).
+// Sections with no content are skipped so filtered-out or empty sections
+// never claim to be fresh.
+func stampSectionMeta(ctx *projctx.ProjectContext, extractors []extractors.Extractor, errs []string) {
+	failed := map[string]bool{}
+	names := make([]string, 0, len(extractors))
+	for i, ex := range extractors {
+		names = append(names, ex.Name())
+		if i < len(errs) && errs[i] != "" {
+			failed[ex.Name()] = true
+		}
+	}
+	present := map[string]bool{}
+	for _, n := range names {
+		present[n] = true
+	}
+	hasContent := map[string]int{}
+	if ctx.Architecture != nil {
+		hasContent["architecture"] = len(ctx.Architecture.Layers) + len(ctx.Architecture.Services)
+	}
+	if ctx.APIs != nil {
+		hasContent["apis"] = len(ctx.APIs.Endpoints)
+	}
+	if ctx.Database != nil {
+		hasContent["database"] = len(ctx.Database.Models)
+	}
+	if ctx.Dependencies != nil {
+		hasContent["dependencies"] = len(ctx.Dependencies.Direct) + len(ctx.Dependencies.Dev)
+	}
+	if ctx.BusinessRules != nil {
+		hasContent["business_rules"] = len(ctx.BusinessRules.Rules)
+	}
+	if ctx.Environment != nil {
+		hasContent["environment"] = len(ctx.Environment.Variables)
+	}
+	if ctx.FileStructure != nil {
+		hasContent["file_structure"] = len(ctx.FileStructure.KeyFiles)
+	}
+	if ctx.CurrentState != nil {
+		hasContent["current_state"] = len(ctx.CurrentState.TODOs)
+	}
+	keys := make([]string, 0, len(sectionExtractors))
+	for k := range sectionExtractors {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	meta := map[string]*projctx.SectionMeta{}
+	for _, k := range keys {
+		count, ok := hasContent[k]
+		if !ok {
+			continue
+		}
+		var ran []string
+		succeeded := 0
+		for _, n := range sectionExtractors[k] {
+			if !present[n] {
+				continue
+			}
+			ran = append(ran, n)
+			if !failed[n] {
+				succeeded++
+			}
+		}
+		if len(ran) == 0 {
+			continue
+		}
+		conf := float64(succeeded) / float64(len(ran))
+		conf = float64(int(conf*100+0.5)) / 100 // 2dp, deterministic
+		source := "regex"
+		if k == "apis" {
+			hasAST, hasRegex := false, false
+			for _, n := range ran {
+				if failed[n] {
+					continue
+				}
+				if n == "sidecar-ast" {
+					hasAST = true
+				} else {
+					hasRegex = true
+				}
+			}
+			switch {
+			case hasRegex && hasAST:
+				source = "regex+ast"
+			case hasAST:
+				source = "ast"
+			}
+		}
+		meta[k] = &projctx.SectionMeta{
+			ExtractedAt: ctx.ExtractedAt,
+			Staleness:   ctx.Staleness(ctx.ExtractedAt.Add(time.Second)),
+			Source:      source,
+			Extractors:  ran,
+			Confidence:  conf,
+			ItemCount:   count,
+		}
+	}
+	if len(meta) > 0 {
+		ctx.SectionMeta = meta
+	}
 }
 
 // mergePartials combines per-extractor partials in order with global

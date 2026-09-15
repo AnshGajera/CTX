@@ -10,12 +10,12 @@ import (
 
 // ProjectContext is the root structured context document.
 type ProjectContext struct {
-	Version       int                   `json:"version"`
-	ContextID     string                `json:"context_id"`
-	ProjectName   string                `json:"project_name"`
-	ExtractedAt   time.Time             `json:"extracted_at"`
-	ContentHash   string                `json:"content_hash"`
-	Profile       ProjectProfile        `json:"profile"`
+	Version       int                     `json:"version"`
+	ContextID     string                  `json:"context_id"`
+	ProjectName   string                  `json:"project_name"`
+	ExtractedAt   time.Time               `json:"extracted_at"`
+	ContentHash   string                  `json:"content_hash"`
+	Profile       ProjectProfile          `json:"profile"`
 	Architecture  *ArchitectureContext  `json:"architecture,omitempty"`
 	APIs          *APIContext           `json:"apis,omitempty"`
 	Database      *DatabaseContext      `json:"database,omitempty"`
@@ -26,6 +26,19 @@ type ProjectContext struct {
 	Decisions     *DecisionContext      `json:"decisions,omitempty"`
 	Patterns      *PatternContext       `json:"patterns,omitempty"`
 	CurrentState  *ProjectStateContext  `json:"current_state,omitempty"`
+
+	// Cross-project awareness
+	ExternalDeps     []ExternalServiceDep `json:"external_deps,omitempty"`
+	SharedInterfaces []SharedInterface    `json:"shared_interfaces,omitempty"`
+
+	// AI agent memory — conventions discovered by AI agents during development
+	AIConventions []AIConvention `json:"ai_conventions,omitempty"`
+
+	// Section-level freshness metadata
+	SectionMeta map[string]*SectionMeta `json:"section_meta,omitempty"`
+
+	// Health score (computed, not persisted in context.json)
+	HealthScore *HealthScore `json:"health_score,omitempty"`
 }
 
 // Language is a detected programming language share.
@@ -309,6 +322,65 @@ type ProjectStateContext struct {
 	RecentlyChanged []string `json:"recently_changed,omitempty"`
 	ActiveAreas     []string `json:"active_areas,omitempty"`
 	TODOs           []TODO   `json:"todos,omitempty"`
+}
+
+// --- Cross-project & AI agent types ---
+
+// ExternalServiceDep represents a dependency on another CTX-tracked project.
+type ExternalServiceDep struct {
+	ProjectID   string   `json:"project_id,omitempty"`
+	ProjectName string   `json:"project_name"`
+	UsedAPIs    []string `json:"used_apis,omitempty"`
+	UsedModels  []string `json:"used_models,omitempty"`
+	Protocol    string   `json:"protocol,omitempty"`
+}
+
+// SharedInterface declares what this project exposes to other services.
+type SharedInterface struct {
+	Name        string   `json:"name"`
+	Type        string   `json:"type"`
+	Endpoints   []string `json:"endpoints,omitempty"`
+	Events      []string `json:"events,omitempty"`
+	Description string   `json:"description,omitempty"`
+}
+
+// AIConvention is a pattern/convention discovered by an AI agent.
+type AIConvention struct {
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	Source      string    `json:"source"`
+	Confidence  float64   `json:"confidence"`
+	DiscoveredAt time.Time `json:"discovered_at"`
+	Examples    []string  `json:"examples,omitempty"`
+}
+
+// SectionMeta holds freshness and quality metadata for a context section.
+// ExtractedAt and Staleness are volatile and excluded from CanonicalHash;
+// Source/Extractors/Confidence/ItemCount are content and hashed.
+type SectionMeta struct {
+	ExtractedAt time.Time `json:"extracted_at"`
+	Staleness   string    `json:"staleness"`
+	Confidence  float64   `json:"confidence"`
+	Source      string    `json:"source"`
+	Extractors  []string  `json:"extractors,omitempty"`
+	ItemCount   int       `json:"item_count"`
+}
+
+// HealthScore represents overall context quality.
+type HealthScore struct {
+	Score        int            `json:"score"`
+	Grade        string         `json:"grade"`
+	Checks       []HealthCheck  `json:"checks"`
+	Tips         []string       `json:"tips,omitempty"`
+}
+
+// HealthCheck is one item in the health report.
+type HealthCheck struct {
+	Name     string `json:"name"`
+	Status   string `json:"status"`
+	Message  string `json:"message"`
+	Score    int    `json:"score"`
+	MaxScore int    `json:"max_score"`
 }
 
 // Save writes the context to ctxDir/context.json.

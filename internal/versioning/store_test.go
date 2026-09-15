@@ -47,6 +47,7 @@ func TestCommitDedupesUnchangedAutoExtract(t *testing.T) {
 }
 
 func TestCommitCustomMessageAlwaysSnapshots(t *testing.T) {
+
 	dir := t.TempDir()
 	store := NewContextStore(dir)
 	ctx := &projctx.ProjectContext{Version: 1, ProjectName: "x"}
@@ -61,5 +62,25 @@ func TestCommitCustomMessageAlwaysSnapshots(t *testing.T) {
 	ctx2 := &projctx.ProjectContext{Version: 1, ProjectName: "y"}
 	if _, deduped, err := store.Commit(ctx2, "release checkpoint"); err != nil || deduped {
 		t.Fatalf("changed content must snapshot: %v deduped=%v", err, deduped)
+	}
+}
+
+func TestCanonicalHashIgnoresSectionMetaTime(t *testing.T) {
+	mk := func(ts time.Time) *projctx.ProjectContext {
+		return &projctx.ProjectContext{Version: 1, ProjectName: "x", ExtractedAt: ts,
+			SectionMeta: map[string]*projctx.SectionMeta{
+				"apis": {ExtractedAt: ts, Source: "regex", Confidence: 1},
+			}}
+	}
+	ha, err := CanonicalHash(mk(time.Now().UTC()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	hb, err := CanonicalHash(mk(time.Now().UTC().Add(time.Hour)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ha != hb {
+		t.Fatalf("meta timestamps must not affect hash: %s vs %s", ha, hb)
 	}
 }
