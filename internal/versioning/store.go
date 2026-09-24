@@ -33,7 +33,25 @@ type ContextStore struct {
 }
 
 // NewContextStore creates a store.
-func NewContextStore(ctxDir string) *ContextStore {
+func NewContextStore(dir string) *ContextStore {
+	// Smart path resolution: allow passing either the project root or the .ctx folder directly
+	ctxDir := dir
+	if filepath.Base(dir) != ".ctx" {
+		ctxDir = filepath.Join(dir, ".ctx")
+	}
+
+	// Auto-initialize the required directory structure so checkout operations never panic
+	_ = os.MkdirAll(ctxDir, 0755)
+	_ = os.MkdirAll(filepath.Join(ctxDir, "objects"), 0755)
+	_ = os.MkdirAll(filepath.Join(ctxDir, "refs", "heads"), 0755)
+	_ = os.MkdirAll(filepath.Join(ctxDir, "refs", "tags"), 0755)
+
+	// Ensure HEAD is pointing to main on fresh initialization
+	headFile := filepath.Join(ctxDir, "HEAD")
+	if _, err := os.Stat(headFile); os.IsNotExist(err) {
+		_ = os.WriteFile(headFile, []byte("ref: refs/heads/main\n"), 0644)
+	}
+
 	return &ContextStore{ctxDir: ctxDir}
 }
 
