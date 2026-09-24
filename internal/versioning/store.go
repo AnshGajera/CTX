@@ -33,7 +33,25 @@ type ContextStore struct {
 }
 
 // NewContextStore creates a store.
-func NewContextStore(ctxDir string) *ContextStore {
+func NewContextStore(dir string) *ContextStore {
+	// Smart path resolution: allow passing either the project root or the .ctx folder directly
+	ctxDir := dir
+	if filepath.Base(dir) != ".ctx" {
+		ctxDir = filepath.Join(dir, ".ctx")
+	}
+
+	// Auto-initialize the required directory structure so checkout operations never panic
+	_ = os.MkdirAll(ctxDir, 0755)
+	_ = os.MkdirAll(filepath.Join(ctxDir, "objects"), 0755)
+	_ = os.MkdirAll(filepath.Join(ctxDir, "refs", "heads"), 0755)
+	_ = os.MkdirAll(filepath.Join(ctxDir, "refs", "tags"), 0755)
+
+	// Ensure HEAD is pointing to main on fresh initialization
+	headFile := filepath.Join(ctxDir, "HEAD")
+	if _, err := os.Stat(headFile); os.IsNotExist(err) {
+		_ = os.WriteFile(headFile, []byte("ref: refs/heads/main\n"), 0644)
+	}
+
 	return &ContextStore{ctxDir: ctxDir}
 }
 
@@ -123,19 +141,43 @@ func (s *ContextStore) Commit(ctx *projctx.ProjectContext, message string) (snap
 	if err := os.WriteFile(filepath.Join(s.snapshotsDir(), hash+".json"), out, 0o644); err != nil {
 		return nil, false, fmt.Errorf("write snapshot: %w", err)
 	}
-	if err := os.WriteFile(s.headPath(), []byte(hash), 0o644); err != nil {
+	if err := s.updateHead(hash); err != nil {
 		return nil, false, fmt.Errorf("write HEAD: %w", err)
 	}
 	return snap, false, nil
 }
 
-// GetHead reads the HEAD file.
+// CanonicalOrCheckpointHash generates a hash for an explicit checkpoint.
+func CanonicalOrCheckpointHash(ctx *projctx.ProjectContext, message string) string {
+	baseHash, err := CanonicalHash(ctx)
+	if err != nil {
+		baseHash = fmt.Sprintf("%d", time.Now().UnixNano())
+	}
+	raw := fmt.Sprintf("%s:%s:%d", baseHash, message, time.Now().UnixNano())
+	sum := sha256.Sum256([]byte(raw))
+	return hex.EncodeToString(sum[:16])
+}
+
+// GetHead reads and resolves the HEAD file (supports symbolic refs and detached hashes).
 func (s *ContextStore) GetHead() (string, error) {
 	data, err := os.ReadFile(s.headPath())
 	if err != nil {
 		return "", err
 	}
-	return strings.TrimSpace(string(data)), nil
+	str := strings.TrimSpace(string(data))
+	if strings.HasPrefix(str, "ref: ") {
+		relRef := strings.TrimSpace(strings.TrimPrefix(str, "ref: "))
+		targetPath := filepath.Join(s.ctxDir, filepath.FromSlash(relRef))
+		refData, err := os.ReadFile(targetPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return "", nil
+			}
+			return "", err
+		}
+		return strings.TrimSpace(string(refData)), nil
+	}
+	return str, nil
 }
 
 // LoadSnapshot loads one snapshot by hash (supports HEAD and HEAD~N).
@@ -154,6 +196,13 @@ func (s *ContextStore) LoadSnapshot(hash string) (*ContextSnapshot, error) {
 			return nil, fmt.Errorf("bad revision %s", hash)
 		}
 		return s.resolveHeadN(n)
+	}
+	// Check if hash matches a branch name
+	if data, err := os.ReadFile(filepath.Join(s.refsHeadsDir(), hash)); err == nil {
+		hash = strings.TrimSpace(string(data))
+	} else if data, err := os.ReadFile(filepath.Join(s.refsTagsDir(), hash)); err == nil {
+		// Check if hash matches a tag name
+		hash = strings.TrimSpace(string(data))
 	}
 	// short-hash prefix match
 	if len(hash) < 32 {

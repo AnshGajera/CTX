@@ -50,3 +50,5 @@ htmlcov/
 # Misc
 *.log
 tmp/
+
+.ctx/cache/

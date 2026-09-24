@@ -25,6 +25,20 @@ ctx export --format openapi -o openapi.json
 ctx serve --ui             # dashboard at http://127.0.0.1:3100/ui
 ctx serve --stdio          # MCP for Cursor / Claude Desktop / VS Code
 ctx dashboard              # terminal task menu (extract/search/diff/history/serve/export)
+
+# Git Context Control (GCC)
+ctx branch feature-auth    # create a context branch
+ctx checkout feature-auth  # switch context branch
+ctx commit -m "auth done"  # save a reasoning checkpoint
+ctx merge feature-auth     # merge context branches
+ctx tag v1.0.0             # tag a context milestone
+ctx log                    # history with branch/tag decorations
+
+# Version management
+ctx bump current           # show current version
+ctx bump patch             # 0.1.5 -> 0.1.6
+ctx bump minor --tag       # 0.1.5 -> 0.2.0 + git tag v0.2.0
+ctx bump major --dry-run   # preview major bump without writing
 ```
 
 Non-interactive (CI/scripts): `ctx init --yes` skips the wizard; `--editor cursor|claude-desktop|vscode|none` and `--sections api_endpoints` preselect wizard answers. `--json` on init/extract/status/diff/log/search/eval/health gives machine-readable output.
@@ -35,9 +49,9 @@ Non-interactive (CI/scripts): `ctx init --yes` skips the wizard; `--editor curso
 |---|---|
 | `ctx init [--name]` | Detect stack, write `.ctx/`, install git hook |
 | `ctx extract` | Run extractors, sanitize, save + snapshot (skips when unchanged) |
-| `ctx status` | Counts, branch, diff vs parent |
-| `ctx diff [h1] [h2]` | Colored snapshot diff (supports `HEAD~N`) |
-| `ctx log` | Snapshot history |
+| `ctx status` | Counts, context branch, diff vs parent |
+| `ctx diff [h1] [h2]` | Colored snapshot diff (supports `HEAD~N`, branch, tag refs) |
+| `ctx log` | Snapshot history with branch/tag decorations |
 | `ctx search <q>` | Hybrid semantic search over context |
 | `ctx eval` | Retrieval `hit@k` self-eval |
 | `ctx health` | Context quality score (0-100) with tips |
@@ -46,6 +60,14 @@ Non-interactive (CI/scripts): `ctx init --yes` skips the wizard; `--editor curso
 | `ctx serve [--ui] [--bind]` | MCP server (HTTP + stdio) + embedded web dashboard |
 | `ctx watch` | File watcher with debounce (single-flight re-extract) |
 | `ctx push/pull/share/login` | Team sync via `ctx-server` (self-hosted, JWT) |
+| **Git Context Control (GCC)** | |
+| `ctx branch [name]` | List, create (`ctx branch feat`), or delete (`-d feat`) context branches |
+| `ctx checkout <target>` | Switch context branch or restore snapshot (`-b` creates new branch) |
+| `ctx commit -m "msg"` | Record explicit context checkpoint / reasoning milestone |
+| `ctx merge <branch>` | Merge context from another branch (reconciles APIs, models, env, deps) |
+| `ctx tag [name]` | Tag context snapshots as milestones (`-d` to delete, `-l` to list) |
+| **Version management** | |
+| `ctx bump [patch\|minor\|major]` | Bump semver across `version.go`, `_version.py` (supports `--tag`, `--dry-run`) |
 
 ## MCP integration (stdio-first)
 
@@ -61,7 +83,43 @@ Non-interactive (CI/scripts): `ctx init --yes` skips the wizard; `--editor curso
 
 Tools: `get_project_context` (supports `sections`, `max_tokens`), `get_context_for_task`, `get_context_for_file`, `get_api_endpoints`, `get_database_schema`, `get_project_conventions`, `get_env_requirements`, `search_context`.
 
+GCC tools (available via MCP stdio and HTTP): `branch_context` (list/create/delete context branches), `checkout_context` (switch active branch), `commit_context` (save reasoning checkpoint), `merge_context` (reconcile branches), `tag_context` (milestone tagging), `get_context_diff` (structured diff between refs), `get_context_history` (timeline with branch/tag metadata).
+
 Tip: `GET /context?max_tokens=4000` returns budget-truncated context (least-important sections dropped first) so large repos fit model windows.
+
+## Git Context Control (GCC)
+
+Inspired by the [Git-Context-Controller](https://arxiv.org/abs/2508.00031) framework, CTX treats context as a versioned, branching file system — giving AI agents structured long-term memory with `COMMIT`, `BRANCH`, `MERGE`, and `CONTEXT` operations.
+
+**Branches** let agents explore alternative reasoning paths or sub-tasks without polluting the main context. **Checkpoints** (`ctx commit`) save explicit milestones with descriptions. **Merge** reconciles context discovered on different branches (APIs, models, env vars, deps, patterns) with intelligent deduplication. **Tags** mark release baselines or milestone snapshots.
+
+Context state is stored under `.ctx/refs/heads/` (branches) and `.ctx/refs/tags/` (tags), with a git-style `HEAD` file (symbolic ref or detached hash). All existing commands (`diff`, `log`, `status`, `serve`, `search`) work seamlessly with the active branch.
+
+```bash
+ctx branch                         # list branches (* marks current)
+ctx checkout -b explore-auth       # create and switch to new branch
+ctx extract                        # extract on the new branch
+ctx commit -m "auth endpoints discovered"  # save milestone
+ctx checkout main                  # switch back
+ctx merge explore-auth             # integrate discoveries
+ctx tag v1.0.0-alpha               # tag the merged state
+ctx log                            # see decorated history
+```
+
+## Version bump (`ctx bump`)
+
+`ctx bump` provides semver version management for Go projects, auto-detecting the current version from `_version.py`, `internal/version/version.go`, or git tags, and bumping it across all version files in one command.
+
+```bash
+ctx bump current                  # display current version
+ctx bump patch                    # 0.1.5 -> 0.1.6, updates version.go + _version.py
+ctx bump minor --tag              # 0.1.5 -> 0.2.0, creates git tag v0.2.0
+ctx bump major --dry-run          # preview 0.1.5 -> 1.0.0 without writing
+ctx bump 2.0.0-rc.1 --tag         # set explicit version + tag
+ctx bump patch --file pkg/ver.go  # include additional version files
+```
+
+Supports `--json` for CI integration. `--dry-run` previews changes without modifying files.
 
 ## Dashboard + health + freshness
 
@@ -128,3 +186,5 @@ Never stores `.env` values — only names, categories, required flags. Sensitive
 ## Contributing / License
 
 MIT. See `Makefile` (`build/test/test-go/test-python/lint/release`). Run `go test ./...` and `python -m pytest ctx-ml/tests` before PRs. See `CONTRIBUTING.md` and `SECURITY.md`.
+
+Version: `0.1.5` — bump with `ctx bump patch` or `make build VERSION=0.2.0`.

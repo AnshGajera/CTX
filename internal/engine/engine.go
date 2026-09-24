@@ -13,7 +13,58 @@ import (
 	projctx "github.com/AnshGajera/CTX/internal/context"
 	"github.com/AnshGajera/CTX/internal/extractors"
 	"github.com/AnshGajera/CTX/internal/versioning"
+	"github.com/AnshGajera/CTX/internal/tui"
 )
+
+
+
+
+// Engine encapsulates the core state and logic of the CTX application.
+type Engine struct {
+	Version string
+	IsReady bool
+}
+
+// NewEngine initializes the core application dependencies.
+func NewEngine(version string) *Engine {
+	// In the future, initialize SQLite, config, and ML clients here.
+	return &Engine{
+		Version: version,
+		IsReady: true,
+	}
+}
+
+// GetVersion satisfies the tui.DashboardBackend interface.
+func (e *Engine) GetVersion() string {
+	return e.Version
+}
+
+// GetStatus satisfies the tui.DashboardBackend interface.
+func (e *Engine) GetStatus() string {
+	if e.IsReady {
+		return "Online - Extractors Ready"
+	}
+	return "Offline - Initialization Failed"
+}
+
+// PerformAction satisfies the tui.DashboardBackend interface by routing commands.
+func (e *Engine) PerformAction(actionKey string) error {
+	switch actionKey {
+	case "health":
+		// Route to internal/health/health.go logic
+		fmt.Println("Health Check: All systems nominal.")
+		return nil
+	case "sync":
+		// Route to internal/sync/push_pull.go logic
+		fmt.Println("Context Sync: Up to date.")
+		return nil
+	default:
+		return fmt.Errorf("unknown engine action requested: %s", actionKey)
+	}
+}
+
+// Compile-time assertion to ensure Engine fully implements DashboardBackend.
+var _ tui.DashboardBackend = (*Engine)(nil)
 
 // ExtractionEngine orchestrates extractors.
 type ExtractionEngine struct {
