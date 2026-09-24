@@ -2,14 +2,22 @@ package versioning
 
 import (
 	"testing"
+	"os"
+	"path/filepath"
 
 	projctx "github.com/AnshGajera/CTX/internal/context"
 )
 
 func TestBranchAndCheckout(t *testing.T) {
 	dir := t.TempDir()
+	ctxDir := filepath.Join(dir, ".ctx")
+	if err := os.MkdirAll(ctxDir, 0755); err != nil {
+		t.Fatalf("failed to create .ctx dir: %v", err)
+	}
+	if err := os.MkdirAll(ctxDir, 0755); err != nil {
+		t.Fatalf("failed to create .ctx dir: %v", err)
+	}
 	store := NewContextStore(dir)
-
 	ctx1 := &projctx.ProjectContext{
 		Version:     1,
 		ProjectName: "app",
