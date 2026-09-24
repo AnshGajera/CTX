@@ -262,7 +262,7 @@ func (s *MCPServer) handleToolCall(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	result, err := DispatchTool(ctx, req.Name, req.Arguments)
+	result, err := DispatchToolWithStore(ctx, s.store, s.root, req.Name, req.Arguments)
 	if err != nil {
 		if strings.Contains(err.Error(), "unknown tool") {
 			http.Error(w, err.Error(), http.StatusNotFound)

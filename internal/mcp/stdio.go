@@ -92,7 +92,7 @@ func (s *StdioServer) Serve() error {
 				writeRPC(out, rpcResponse{JSONRPC: "2.0", ID: req.ID, Error: &rpcErr{Code: -32000, Message: err.Error()}})
 				continue
 			}
-			res, err := DispatchTool(ctx, p.Name, p.Arguments)
+			res, err := DispatchToolWithStore(ctx, s.store, s.root, p.Name, p.Arguments)
 			if err != nil {
 				writeRPC(out, rpcResponse{JSONRPC: "2.0", ID: req.ID, Error: &rpcErr{Code: -32602, Message: err.Error()}})
 				continue

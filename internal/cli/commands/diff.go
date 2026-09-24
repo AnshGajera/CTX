@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/AnshGajera/CTX/internal/versioning"
 	"github.com/fatih/color"
@@ -100,8 +101,47 @@ func LogCommand() *cli.Command {
 			if c.Bool("json") {
 				return json.NewEncoder(os.Stdout).Encode(snaps)
 			}
+			branches, _ := store.ListBranches()
+			tags, _ := store.ListTags()
+			curBranch, isDetached, _ := store.CurrentBranch()
+
+			branchMap := make(map[string][]string)
+			for _, b := range branches {
+				branchMap[b.Hash] = append(branchMap[b.Hash], b.Name)
+			}
+			tagMap := make(map[string][]string)
+			for _, t := range tags {
+				tagMap[t.Hash] = append(tagMap[t.Hash], t.Name)
+			}
+
 			for _, s := range snaps {
-				color.Cyan("%s  %s  %s", shortHash(s.Hash), s.Timestamp.Format("2006-01-02 15:04"), s.Author)
+				var decorations []string
+				if !isDetached && curBranch != "" {
+					for _, bName := range branchMap[s.Hash] {
+						if bName == curBranch {
+							decorations = append(decorations, color.GreenString("HEAD -> "+curBranch))
+						} else {
+							decorations = append(decorations, color.GreenString(bName))
+						}
+					}
+				} else {
+					for _, bName := range branchMap[s.Hash] {
+						decorations = append(decorations, color.GreenString(bName))
+					}
+					if isDetached && s.Hash == curBranch {
+						decorations = append(decorations, color.YellowString("HEAD"))
+					}
+				}
+				for _, tName := range tagMap[s.Hash] {
+					decorations = append(decorations, color.YellowString("tag: "+tName))
+				}
+
+				decStr := ""
+				if len(decorations) > 0 {
+					decStr = fmt.Sprintf(" (%s)", strings.Join(decorations, ", "))
+				}
+
+				color.Cyan("%s%s  %s  %s", shortHash(s.Hash), decStr, s.Timestamp.Format("2006-01-02 15:04"), s.Author)
 				fmt.Printf("    %s\n", s.Message)
 			}
 			if len(snaps) == 0 {

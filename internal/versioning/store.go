@@ -123,19 +123,43 @@ func (s *ContextStore) Commit(ctx *projctx.ProjectContext, message string) (snap
 	if err := os.WriteFile(filepath.Join(s.snapshotsDir(), hash+".json"), out, 0o644); err != nil {
 		return nil, false, fmt.Errorf("write snapshot: %w", err)
 	}
-	if err := os.WriteFile(s.headPath(), []byte(hash), 0o644); err != nil {
+	if err := s.updateHead(hash); err != nil {
 		return nil, false, fmt.Errorf("write HEAD: %w", err)
 	}
 	return snap, false, nil
 }
 
-// GetHead reads the HEAD file.
+// CanonicalOrCheckpointHash generates a hash for an explicit checkpoint.
+func CanonicalOrCheckpointHash(ctx *projctx.ProjectContext, message string) string {
+	baseHash, err := CanonicalHash(ctx)
+	if err != nil {
+		baseHash = fmt.Sprintf("%d", time.Now().UnixNano())
+	}
+	raw := fmt.Sprintf("%s:%s:%d", baseHash, message, time.Now().UnixNano())
+	sum := sha256.Sum256([]byte(raw))
+	return hex.EncodeToString(sum[:16])
+}
+
+// GetHead reads and resolves the HEAD file (supports symbolic refs and detached hashes).
 func (s *ContextStore) GetHead() (string, error) {
 	data, err := os.ReadFile(s.headPath())
 	if err != nil {
 		return "", err
 	}
-	return strings.TrimSpace(string(data)), nil
+	str := strings.TrimSpace(string(data))
+	if strings.HasPrefix(str, "ref: ") {
+		relRef := strings.TrimSpace(strings.TrimPrefix(str, "ref: "))
+		targetPath := filepath.Join(s.ctxDir, filepath.FromSlash(relRef))
+		refData, err := os.ReadFile(targetPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return "", nil
+			}
+			return "", err
+		}
+		return strings.TrimSpace(string(refData)), nil
+	}
+	return str, nil
 }
 
 // LoadSnapshot loads one snapshot by hash (supports HEAD and HEAD~N).
@@ -154,6 +178,13 @@ func (s *ContextStore) LoadSnapshot(hash string) (*ContextSnapshot, error) {
 			return nil, fmt.Errorf("bad revision %s", hash)
 		}
 		return s.resolveHeadN(n)
+	}
+	// Check if hash matches a branch name
+	if data, err := os.ReadFile(filepath.Join(s.refsHeadsDir(), hash)); err == nil {
+		hash = strings.TrimSpace(string(data))
+	} else if data, err := os.ReadFile(filepath.Join(s.refsTagsDir(), hash)); err == nil {
+		// Check if hash matches a tag name
+		hash = strings.TrimSpace(string(data))
 	}
 	// short-hash prefix match
 	if len(hash) < 32 {

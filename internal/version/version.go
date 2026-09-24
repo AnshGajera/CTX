@@ -10,7 +10,7 @@ type Info struct {
 }
 
 var (
-	Version = "dev"
+	Version = "0.1.5"
 	Commit  = "none"
 	Date    = "unknown"
 )
