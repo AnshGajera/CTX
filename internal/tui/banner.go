@@ -18,7 +18,8 @@ var bannerLines = []string{
 
 // PrintBanner prints the ctx banner and tagline (human output only;
 // callers must skip it in --json / non-TTY mode).
-func PrintBanner() {
+func PrintBanner(version string) {
+	fmt.Println("CTX Engine ", version)
 	cyan := color.New(color.FgCyan, color.Bold)
 	for _, l := range bannerLines {
 		cyan.Println(l)
