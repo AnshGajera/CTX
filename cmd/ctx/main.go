@@ -9,6 +9,7 @@ import (
 	// Import the package where your DashboardBackend interface is implemented
 	"github.com/AnshGajera/CTX/internal/engine" 
 )
+
 const version = "0.1.6"
 func main() {
 	dashboardFlag := flag.Bool("dashboard", false, "Launch the interactive terminal dashboard")
@@ -18,7 +19,7 @@ func main() {
 
 	if *dashboardFlag || len(os.Args) == 1 {
 		// Initialize the backend dependency required by the TUI
-		backend := engine.NewEngine() 
+		backend := engine.NewEngine(version) 
 
 		// Launch the dashboard and catch any lifecycle errors
 		if err := tui.RunDashboard(backend); err != nil {

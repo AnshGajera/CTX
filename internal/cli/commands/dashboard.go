@@ -15,6 +15,7 @@ import (
 	"github.com/AnshGajera/CTX/internal/tui"
 	"github.com/AnshGajera/CTX/internal/versioning"
 	"github.com/urfave/cli/v2"
+	"github.com/AnshGajera/CTX/internal/version"
 )
 
 // DashboardCommand implements `ctx dashboard`.
@@ -54,7 +55,21 @@ func (b *dashboardBackend) Title() string {
 	head, _ := versioning.NewContextStore(filepath.Join(b.root, ".ctx")).GetHead()
 	return fmt.Sprintf("%s · %s · %s", ctx.ProjectName, shortHash(head), gitBranchOf(ctx))
 }
-
+// GetStatus satisfies the tui.DashboardBackend interface requirements.
+func (d *dashboardBackend) GetStatus() string {
+	// You can replace this string with dynamic health-check logic later
+	return "Online - Dashboard Ready"
+}
+// GetVersion satisfies the tui.DashboardBackend interface requirements.
+func (d *dashboardBackend) GetVersion() string {
+	// Return the current release version
+	return version.Version
+}
+// PerformAction satisfies the tui.DashboardBackend interface requirements.
+func (d *dashboardBackend) PerformAction(actionKey string) error {
+	// Route actions triggered by the TUI or return nil for now
+	return nil
+}
 func gitBranchOf(ctx *projctx.ProjectContext) string {
 	if ctx.CurrentState == nil || ctx.CurrentState.GitBranch == "" {
 		return "no git"
