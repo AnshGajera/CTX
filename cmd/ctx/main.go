@@ -9,7 +9,7 @@ import (
 	// Import the package where your DashboardBackend interface is implemented
 	"github.com/AnshGajera/CTX/internal/engine" 
 )
-const version = "0.1.5"
+const version = "0.1.6"
 func main() {
 	dashboardFlag := flag.Bool("dashboard", false, "Launch the interactive terminal dashboard")
 	flag.Parse()
