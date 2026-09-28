@@ -47,13 +47,18 @@ func StatusCommand() *cli.Command {
 			if ctx.Dependencies != nil {
 				nDeps = len(ctx.Dependencies.Direct) + len(ctx.Dependencies.Dev)
 			}
-			branch := ""
+			ctxBranch, detached, _ := store.CurrentBranch()
+			branchLabel := ctxBranch
+			if detached {
+				branchLabel = "detached HEAD (" + shortHash(ctxBranch) + ")"
+			}
+			gitBranch := ""
 			if ctx.CurrentState != nil {
-				branch = ctx.CurrentState.GitBranch
+				gitBranch = ctx.CurrentState.GitBranch
 			}
 			color.Cyan("Project: %s", ctx.ProjectName)
-			fmt.Printf("Hash: %s  Branch: %s  Updated: %s ago\n",
-				shortHash(head), branch, ago(ctx.ExtractedAt))
+			fmt.Printf("Context Branch: %s  Hash: %s  Git: %s  Updated: %s ago\n",
+				color.GreenString(branchLabel), shortHash(head), gitBranch, ago(ctx.ExtractedAt))
 			table := tablewriter.NewWriter(os.Stdout)
 			table.SetHeader([]string{"Metric", "Count"})
 			table.Append([]string{"Endpoints", fmt.Sprint(nEP)})

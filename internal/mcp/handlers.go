@@ -2,19 +2,31 @@ package mcp
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/AnshGajera/CTX/internal/ai"
 	projctx "github.com/AnshGajera/CTX/internal/context"
 	"github.com/AnshGajera/CTX/internal/health"
+	"github.com/AnshGajera/CTX/internal/versioning"
 )
 
-// DispatchTool executes a tool by name.
+// DispatchTool executes a tool by name (legacy signature).
 func DispatchTool(ctx *projctx.ProjectContext, name string, args map[string]any) (any, error) {
+	return DispatchToolWithStore(ctx, nil, "", name, args)
+}
+
+// DispatchToolWithStore executes a tool with access to the context versioning store.
+func DispatchToolWithStore(ctx *projctx.ProjectContext, store *versioning.ContextStore, root string, name string, args map[string]any) (any, error) {
 	if args == nil {
 		args = map[string]any{}
 	}
+
+	if store == nil && root != "" {
+		store = versioning.NewContextStore(filepath.Join(root, ".ctx"))
+	}
+
 	switch name {
 	case "get_project_context":
 		sections := toStringSlice(args["sections"])
@@ -47,6 +59,199 @@ func DispatchTool(ctx *projctx.ProjectContext, name string, args map[string]any)
 			return nil, fmt.Errorf("query is required")
 		}
 		return SearchChunks(ctx, query, toInt(args["top_k"], 5)), nil
+
+	// --- Git Context Control (GCC) AI Agent Tools ---
+	case "branch_context":
+		if store == nil {
+			return nil, fmt.Errorf("version store not available")
+		}
+		action, _ := args["action"].(string)
+		branch, _ := args["branch"].(string)
+		startPoint, _ := args["start_point"].(string)
+		if startPoint == "" {
+			startPoint = "HEAD"
+		}
+		switch action {
+		case "list":
+			branches, err := store.ListBranches()
+			if err != nil {
+				return nil, err
+			}
+			return map[string]any{"branches": branches}, nil
+		case "create":
+			if branch == "" {
+				return nil, fmt.Errorf("branch name is required for create")
+			}
+			if err := store.CreateBranch(branch, startPoint); err != nil {
+				return nil, err
+			}
+			return map[string]any{"created_branch": branch, "start_point": startPoint}, nil
+		case "delete":
+			if branch == "" {
+				return nil, fmt.Errorf("branch name is required for delete")
+			}
+			if err := store.DeleteBranch(branch); err != nil {
+				return nil, err
+			}
+			return map[string]any{"deleted_branch": branch}, nil
+		default:
+			return nil, fmt.Errorf("unknown branch action: %s (must be list, create, delete)", action)
+		}
+
+	case "checkout_context":
+		if store == nil {
+			return nil, fmt.Errorf("version store not available")
+		}
+		target, _ := args["target"].(string)
+		if strings.TrimSpace(target) == "" {
+			return nil, fmt.Errorf("target is required for checkout")
+		}
+		createBranch, _ := args["create_branch"].(bool)
+		var snap *versioning.ContextSnapshot
+		var err error
+		if createBranch {
+			snap, err = store.CheckoutNewBranch(target, "HEAD")
+		} else {
+			snap, err = store.Checkout(target)
+		}
+		if err != nil {
+			return nil, err
+		}
+		curBranch, isDetached, _ := store.CurrentBranch()
+		return map[string]any{
+			"checked_out": target,
+			"branch":      curBranch,
+			"is_detached": isDetached,
+			"snapshot":    snap.Hash,
+			"message":     snap.Message,
+		}, nil
+
+	case "commit_context":
+		if store == nil {
+			return nil, fmt.Errorf("version store not available")
+		}
+		msg, _ := args["message"].(string)
+		if strings.TrimSpace(msg) == "" {
+			return nil, fmt.Errorf("message is required for commit_context")
+		}
+		snap, err := store.CommitCheckpoint(ctx, msg)
+		if err != nil {
+			return nil, err
+		}
+		curBranch, detached, _ := store.CurrentBranch()
+		return map[string]any{
+			"snapshot":    snap.Hash,
+			"branch":      curBranch,
+			"is_detached": detached,
+			"message":     snap.Message,
+		}, nil
+
+	case "merge_context":
+		if store == nil {
+			return nil, fmt.Errorf("version store not available")
+		}
+		sourceBranch, _ := args["source_branch"].(string)
+		if strings.TrimSpace(sourceBranch) == "" {
+			return nil, fmt.Errorf("source_branch is required for merge")
+		}
+		msg, _ := args["message"].(string)
+		snap, report, err := store.Merge(sourceBranch, msg)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{
+			"merged_snapshot": snap.Hash,
+			"report":          report,
+		}, nil
+
+	case "tag_context":
+		if store == nil {
+			return nil, fmt.Errorf("version store not available")
+		}
+		action, _ := args["action"].(string)
+		tag, _ := args["tag"].(string)
+		target, _ := args["target"].(string)
+		if target == "" {
+			target = "HEAD"
+		}
+		switch action {
+		case "list":
+			tags, err := store.ListTags()
+			if err != nil {
+				return nil, err
+			}
+			return map[string]any{"tags": tags}, nil
+		case "create":
+			if tag == "" {
+				return nil, fmt.Errorf("tag name is required for create")
+			}
+			if err := store.CreateTag(tag, target); err != nil {
+				return nil, err
+			}
+			return map[string]any{"created_tag": tag, "target": target}, nil
+		case "delete":
+			if tag == "" {
+				return nil, fmt.Errorf("tag name is required for delete")
+			}
+			if err := store.DeleteTag(tag); err != nil {
+				return nil, err
+			}
+			return map[string]any{"deleted_tag": tag}, nil
+		default:
+			return nil, fmt.Errorf("unknown tag action: %s", action)
+		}
+
+	case "get_context_diff":
+		if store == nil {
+			return nil, fmt.Errorf("version store not available")
+		}
+		from, _ := args["from"].(string)
+		to, _ := args["to"].(string)
+		if from == "" {
+			from = "HEAD~1"
+		}
+		if to == "" {
+			to = "HEAD"
+		}
+		s1, err := store.LoadSnapshot(from)
+		if err != nil {
+			return nil, fmt.Errorf("resolve %s: %w", from, err)
+		}
+		s2, err := store.LoadSnapshot(to)
+		if err != nil {
+			return nil, fmt.Errorf("resolve %s: %w", to, err)
+		}
+		c1, err := versioning.SnapshotToContext(s1)
+		if err != nil {
+			return nil, err
+		}
+		c2, err := versioning.SnapshotToContext(s2)
+		if err != nil {
+			return nil, err
+		}
+		diff := versioning.ComputeDiff(c1, c2)
+		return diff, nil
+
+	case "get_context_history":
+		if store == nil {
+			return nil, fmt.Errorf("version store not available")
+		}
+		limit := toInt(args["limit"], 10)
+		snaps, err := store.Log(limit)
+		if err != nil {
+			return nil, err
+		}
+		curBranch, isDetached, _ := store.CurrentBranch()
+		branches, _ := store.ListBranches()
+		tags, _ := store.ListTags()
+		return map[string]any{
+			"current_branch": curBranch,
+			"is_detached":    isDetached,
+			"snapshots":      snaps,
+			"branches":       branches,
+			"tags":           tags,
+		}, nil
+
 	default:
 		return nil, fmt.Errorf("unknown tool: %s", name)
 	}

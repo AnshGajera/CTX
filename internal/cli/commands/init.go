@@ -21,6 +21,7 @@ import (
 	"github.com/AnshGajera/CTX/internal/versioning"
 	"github.com/fatih/color"
 	"github.com/urfave/cli/v2"
+	"github.com/AnshGajera/CTX/internal/version"
 )
 
 var defaultIgnore = `# ctx ignores
@@ -77,7 +78,7 @@ func InitCommand() *cli.Command {
 			interactive := !jsonMode && !c.Bool("yes") && tui.IsTerminal(os.Stdin)
 			reader := bufio.NewReader(os.Stdin)
 			if !jsonMode {
-				tui.PrintBanner()
+				tui.PrintBanner(version.Version)
 				color.Cyan("Detecting project...")
 			}
 			profile, err := detector.New(cwd).Detect()
