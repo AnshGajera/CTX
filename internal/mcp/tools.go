@@ -71,5 +71,61 @@ func ToolDefinitions() []ToolDefinition {
 				"top_k": map[string]any{"type": "integer", "description": "max results (default 5)"},
 			}, []string{"query"}),
 		},
+		{
+			Name:        "branch_context",
+			Description: "Git Context Control: list, create, or delete context branches to explore alternative reasoning paths or sub-tasks without polluting the main context",
+			InputSchema: obj(map[string]any{
+				"action":      map[string]any{"type": "string", "enum": []string{"list", "create", "delete"}, "description": "action to perform"},
+				"branch":      map[string]any{"type": "string", "description": "branch name (for create or delete)"},
+				"start_point": map[string]any{"type": "string", "description": "starting ref or snapshot (default HEAD)"},
+			}, []string{"action"}),
+		},
+		{
+			Name:        "checkout_context",
+			Description: "Git Context Control: switch active context branch or restore context to a snapshot/milestone",
+			InputSchema: obj(map[string]any{
+				"target":        map[string]any{"type": "string", "description": "branch name, tag, or snapshot hash"},
+				"create_branch": map[string]any{"type": "boolean", "description": "if true, creates and switches to a new branch"},
+			}, []string{"target"}),
+		},
+		{
+			Name:        "commit_context",
+			Description: "Git Context Control: save an explicit context checkpoint with a reasoning milestone description",
+			InputSchema: obj(map[string]any{
+				"message": map[string]any{"type": "string", "description": "milestone description or reasoning note"},
+			}, []string{"message"}),
+		},
+		{
+			Name:        "merge_context",
+			Description: "Git Context Control: merge discovered context (APIs, schemas, env vars, dependencies, conventions) from another branch into the active branch",
+			InputSchema: obj(map[string]any{
+				"source_branch": map[string]any{"type": "string", "description": "source branch or ref to merge"},
+				"message":       map[string]any{"type": "string", "description": "merge commit message"},
+			}, []string{"source_branch"}),
+		},
+		{
+			Name:        "tag_context",
+			Description: "Git Context Control: tag a context milestone or release baseline",
+			InputSchema: obj(map[string]any{
+				"action": map[string]any{"type": "string", "enum": []string{"list", "create", "delete"}, "description": "tag operation"},
+				"tag":    map[string]any{"type": "string", "description": "tag name"},
+				"target": map[string]any{"type": "string", "description": "target ref or snapshot hash (default HEAD)"},
+			}, []string{"action"}),
+		},
+		{
+			Name:        "get_context_diff",
+			Description: "Git Context Control: compute structured diff between two context snapshots, branches, or tags",
+			InputSchema: obj(map[string]any{
+				"from": map[string]any{"type": "string", "description": "source ref (default HEAD~1)"},
+				"to":   map[string]any{"type": "string", "description": "target ref (default HEAD)"},
+			}, nil),
+		},
+		{
+			Name:        "get_context_history",
+			Description: "Git Context Control: get context snapshot and checkpoint timeline with branch and tag metadata",
+			InputSchema: obj(map[string]any{
+				"limit": map[string]any{"type": "integer", "description": "maximum snapshots to return (default 10)"},
+			}, nil),
+		},
 	}
 }
