@@ -36,7 +36,11 @@ func main() {
 	}
 
 	if cfg.JWTSecret == "" || cfg.JWTSecret == "change-me-in-production" {
-		log.Println("WARNING: Using default JWT secret. Set -jwt-secret or CTX_JWT_SECRET for production.")
+		if cfg.Debug {
+			log.Println("WARNING: Using default JWT secret. Set -jwt-secret or CTX_JWT_SECRET for production.")
+		} else {
+			log.Fatal("JWT secret required for production. Set -jwt-secret or CTX_JWT_SECRET")
+		}
 	}
 
 	db, err := store.NewSQLiteStore(cfg.DatabaseURL)

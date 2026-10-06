@@ -1,11 +1,14 @@
-FROM golang:1.22-alpine AS builder
+FROM golang:1.24-alpine AS builder
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 go build -ldflags "-s -w" -o /ctx ./cmd/ctx
+ARG VERSION=dev
+ARG COMMIT=none
+ARG DATE=unknown
+RUN CGO_ENABLED=0 go build -ldflags "-s -w -X github.com/AnshGajera/CTX/internal/version.Version=${VERSION} -X github.com/AnshGajera/CTX/internal/version.Commit=${COMMIT} -X github.com/AnshGajera/CTX/internal/version.Date=${DATE}" -o /ctx ./cmd/ctx
 
-FROM alpine:3.19
+FROM alpine:3.20
 RUN apk add --no-cache ca-certificates git
 COPY --from=builder /ctx /usr/local/bin/ctx
 ENTRYPOINT ["ctx"]

@@ -88,10 +88,10 @@ mkdir -p "$HOME/.config/ctx"
 if [ ! -f "$HOME/.config/ctx/config.toml" ]; then
   cat > "$HOME/.config/ctx/config.toml" <<'EOF'
 [core]
-api_url = "https://api.ctx.dev"
-auto_sync = true
-watch_mode = true
-ml_url = "http://localhost:8001"
+api_url = ""
+auto_sync = false
+watch_mode = false
+ml_url = ""
 
 [extraction]
 architecture = true
