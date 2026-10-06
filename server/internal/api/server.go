@@ -76,7 +76,12 @@ func (s *Server) registerRoutes() {
 
 func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		origin := r.Header.Get("Origin")
+		allowed := isOriginAllowed(origin, s.cfg.AllowedOrigins)
+		if allowed != "" {
+			w.Header().Set("Access-Control-Allow-Origin", allowed)
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+		}
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		if r.Method == http.MethodOptions {
@@ -85,6 +90,21 @@ func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func isOriginAllowed(origin string, allowedOrigins []string) string {
+	if len(allowedOrigins) == 0 {
+		return ""
+	}
+	for _, allowed := range allowedOrigins {
+		if allowed == "*" || allowed == origin {
+			if allowed == "*" {
+				return "*"
+			}
+			return origin
+		}
+	}
+	return ""
 }
 
 func (s *Server) authed(next http.HandlerFunc) http.HandlerFunc {

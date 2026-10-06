@@ -52,10 +52,10 @@ type SyncConfig struct {
 func Default() Config {
 	return Config{
 		Core: CoreConfig{
-			APIURL:    "https://api.ctx.dev",
-			AutoSync:  true,
-			WatchMode: true,
-			MLURL:     "http://localhost:8001",
+			APIURL:    "",
+			AutoSync:  false,
+			WatchMode: false,
+			MLURL:     "",
 		},
 		Extraction: ExtractionConfig{
 			Architecture:   true,
@@ -118,14 +118,10 @@ func Load(path string) (Config, error) {
 	_ = toml.Unmarshal(data, &raw)
 	coreRaw, _ := raw["core"].(map[string]any)
 	if _, ok := coreRaw["api_url"]; !ok {
-		if cfg.Core.APIURL == "" {
-			cfg.Core.APIURL = "https://api.ctx.dev"
-		}
+		// Keep empty default - user must explicitly configure
 	}
 	if _, ok := coreRaw["ml_url"]; !ok {
-		if cfg.Core.MLURL == "" {
-			cfg.Core.MLURL = "http://localhost:8001"
-		}
+		// Keep empty default - user must explicitly configure
 	}
 	return cfg, nil
 }

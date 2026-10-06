@@ -28,7 +28,7 @@ func DefaultConfig() *Config {
 		DatabaseURL:    "ctx-server.db",
 		JWTSecret:      "change-me-in-production",
 		Debug:          false,
-		AllowedOrigins: []string{"*"},
+		AllowedOrigins: []string{"http://localhost:3100", "http://127.0.0.1:3100"},
 		RateLimit:      60,
 		RateBurst:      10,
 		MaxContextSize: 10 * 1024 * 1024, // 10 MiB
