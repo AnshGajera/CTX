@@ -289,12 +289,34 @@ type Project struct {
 func (s *SQLiteStore) CreateProject(orgID, name, description, contextID, userID string) (*Project, error) {
 	id := uuid.NewString()
 	now := time.Now().UTC()
-	_, err := s.db.Exec(
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	_, err = tx.Exec(
 		"INSERT INTO projects (id, org_id, name, description, context_id, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
 		id, orgID, name, description, contextID, userID, now, now,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create project: %w", err)
+	}
+
+	_, err = tx.Exec(`
+		INSERT INTO project_teams (project_id, team_id, access)
+		SELECT ?, tm.team_id, CASE tm.role WHEN 'admin' THEN 'admin' ELSE 'write' END
+		FROM team_members tm
+		JOIN teams t ON t.id = tm.team_id
+		WHERE tm.user_id = ? AND t.org_id = ?`,
+		id, userID, orgID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("grant project access: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
 	}
 	return &Project{ID: id, OrgID: orgID, Name: name, Description: description, ContextID: contextID, CreatedBy: userID, CreatedAt: now}, nil
 }
