@@ -20,6 +20,7 @@ type MCPServer struct {
 	root  string
 	port  int
 	bind  string
+	ui    bool
 }
 
 // maxBodyBytes caps JSON request bodies (5 MiB).
@@ -38,6 +39,19 @@ func (s *MCPServer) SetBind(bind string) {
 	if strings.TrimSpace(bind) != "" {
 		s.bind = bind
 	}
+}
+
+// SetUIEnabled controls whether the embedded dashboard is exposed.
+func (s *MCPServer) SetUIEnabled(enabled bool) {
+	s.ui = enabled
+}
+
+func requireMethod(w http.ResponseWriter, r *http.Request, method string) bool {
+	if r.Method != method {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return false
+	}
+	return true
 }
 
 func (s *MCPServer) loadHead() (*projctx.ProjectContext, error) {
@@ -62,10 +76,12 @@ func writeJSON(w http.ResponseWriter, v any) {
 func (s *MCPServer) Handler() http.Handler {
 	mux := http.NewServeMux()
 	// Local web dashboard (single-file, offline, no build step).
-	mux.HandleFunc("/ui", serveUI)
-	mux.HandleFunc("/ui/", serveUI)
+	if s.ui {
+		mux.HandleFunc("/ui", serveUI)
+		mux.HandleFunc("/ui/", serveUI)
+	}
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/" {
+		if s.ui && r.URL.Path == "/" {
 			http.Redirect(w, r, "/ui", http.StatusFound)
 			return
 		}
@@ -83,6 +99,9 @@ func (s *MCPServer) Handler() http.Handler {
 	})
 	mux.HandleFunc("/mcp/tools/call", s.handleToolCall)
 	mux.HandleFunc("/context", func(w http.ResponseWriter, r *http.Request) {
+		if !requireMethod(w, r, http.MethodGet) {
+			return
+		}
 		ctx, err := s.loadHead()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusNotFound)
@@ -98,6 +117,9 @@ func (s *MCPServer) Handler() http.Handler {
 		writeJSON(w, ctx)
 	})
 	mux.HandleFunc("/context/architecture", func(w http.ResponseWriter, r *http.Request) {
+		if !requireMethod(w, r, http.MethodGet) {
+			return
+		}
 		ctx, err := s.loadHead()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusNotFound)
@@ -106,6 +128,9 @@ func (s *MCPServer) Handler() http.Handler {
 		writeJSON(w, ctx.Architecture)
 	})
 	mux.HandleFunc("/context/apis", func(w http.ResponseWriter, r *http.Request) {
+		if !requireMethod(w, r, http.MethodGet) {
+			return
+		}
 		ctx, err := s.loadHead()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusNotFound)
@@ -114,6 +139,9 @@ func (s *MCPServer) Handler() http.Handler {
 		writeJSON(w, ctx.APIs)
 	})
 	mux.HandleFunc("/context/database", func(w http.ResponseWriter, r *http.Request) {
+		if !requireMethod(w, r, http.MethodGet) {
+			return
+		}
 		ctx, err := s.loadHead()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusNotFound)
@@ -122,6 +150,9 @@ func (s *MCPServer) Handler() http.Handler {
 		writeJSON(w, ctx.Database)
 	})
 	mux.HandleFunc("/context/dependencies", func(w http.ResponseWriter, r *http.Request) {
+		if !requireMethod(w, r, http.MethodGet) {
+			return
+		}
 		ctx, err := s.loadHead()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusNotFound)
@@ -130,6 +161,9 @@ func (s *MCPServer) Handler() http.Handler {
 		writeJSON(w, ctx.Dependencies)
 	})
 	mux.HandleFunc("/context/env", func(w http.ResponseWriter, r *http.Request) {
+		if !requireMethod(w, r, http.MethodGet) {
+			return
+		}
 		ctx, err := s.loadHead()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusNotFound)
@@ -138,6 +172,9 @@ func (s *MCPServer) Handler() http.Handler {
 		writeJSON(w, ctx.Environment)
 	})
 	mux.HandleFunc("/context/structure", func(w http.ResponseWriter, r *http.Request) {
+		if !requireMethod(w, r, http.MethodGet) {
+			return
+		}
 		ctx, err := s.loadHead()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusNotFound)
@@ -146,6 +183,9 @@ func (s *MCPServer) Handler() http.Handler {
 		writeJSON(w, ctx.FileStructure)
 	})
 	mux.HandleFunc("/context/state", func(w http.ResponseWriter, r *http.Request) {
+		if !requireMethod(w, r, http.MethodGet) {
+			return
+		}
 		ctx, err := s.loadHead()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusNotFound)
@@ -154,6 +194,9 @@ func (s *MCPServer) Handler() http.Handler {
 		writeJSON(w, ctx.CurrentState)
 	})
 	mux.HandleFunc("/context/summary", func(w http.ResponseWriter, r *http.Request) {
+		if !requireMethod(w, r, http.MethodGet) {
+			return
+		}
 		ctx, err := s.loadHead()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusNotFound)
@@ -162,6 +205,9 @@ func (s *MCPServer) Handler() http.Handler {
 		writeJSON(w, Summarize(ctx))
 	})
 	mux.HandleFunc("/context/for-task", func(w http.ResponseWriter, r *http.Request) {
+		if !requireMethod(w, r, http.MethodPost) {
+			return
+		}
 		var req struct {
 			TaskDescription string   `json:"task_description"`
 			AffectedFiles   []string `json:"affected_files"`
@@ -173,6 +219,8 @@ func (s *MCPServer) Handler() http.Handler {
 				http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
 				return
 			}
+			http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+			return
 		}
 		ctx, err := s.loadHead()
 		if err != nil {
@@ -182,6 +230,9 @@ func (s *MCPServer) Handler() http.Handler {
 		writeJSON(w, ContextForTask(ctx, req.TaskDescription, req.AffectedFiles))
 	})
 	mux.HandleFunc("/context/for-file", func(w http.ResponseWriter, r *http.Request) {
+		if !requireMethod(w, r, http.MethodPost) {
+			return
+		}
 		var req struct {
 			FilePath string `json:"file_path"`
 		}
@@ -192,6 +243,8 @@ func (s *MCPServer) Handler() http.Handler {
 				http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
 				return
 			}
+			http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+			return
 		}
 		if req.FilePath == "" {
 			req.FilePath = r.URL.Query().Get("file_path")
@@ -225,6 +278,9 @@ func (s *MCPServer) Start() error {
 }
 
 func (s *MCPServer) handleToolCall(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodPost) {
+		return
+	}
 	var req struct {
 		Name      string         `json:"name"`
 		Arguments map[string]any `json:"arguments"`
@@ -275,6 +331,9 @@ func (s *MCPServer) handleToolCall(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *MCPServer) handleHistory(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
 	snaps, err := s.store.Log(50)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -287,6 +346,9 @@ func (s *MCPServer) handleHistory(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *MCPServer) handleDiff(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
 	head, err := s.store.GetHead()
 	if err != nil {
 		http.Error(w, "no snapshots (run ctx extract first)", http.StatusNotFound)
@@ -329,6 +391,9 @@ func (s *MCPServer) handleDiff(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *MCPServer) handleSearch(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
 	q := r.URL.Query().Get("q")
 	if q == "" {
 		q = r.URL.Query().Get("query")

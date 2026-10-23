@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/AnshGajera/CTX/internal/versioning"
@@ -24,7 +25,7 @@ type SyncClient struct {
 // NewSyncClient creates a client.
 func NewSyncClient(apiURL, token string) *SyncClient {
 	return &SyncClient{
-		apiURL: apiURL, token: token,
+		apiURL: strings.TrimRight(apiURL, "/"), token: token,
 		http: &http.Client{Timeout: 30 * time.Second},
 	}
 }
@@ -113,7 +114,7 @@ func (c *SyncClient) Login(email, password string) (string, error) {
 		return "", err
 	}
 	body, _ := json.Marshal(map[string]string{"email": email, "password": password})
-	url := c.apiURL + "/auth/login"
+	url := c.apiURL + "/api/v1/auth/login"
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return "", fmt.Errorf("build request: %w", err)

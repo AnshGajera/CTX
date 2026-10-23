@@ -15,6 +15,7 @@ import (
 	"github.com/AnshGajera/CTX/server/internal/auth"
 	"github.com/AnshGajera/CTX/server/internal/config"
 	"github.com/AnshGajera/CTX/server/internal/store"
+	"github.com/AnshGajera/CTX/server/internal/version"
 )
 
 // contextKey is a private type for context keys.
@@ -148,9 +149,9 @@ func getUserID(r *http.Request) string {
 func extractToken(r *http.Request) string {
 	h := r.Header.Get("Authorization")
 	if strings.HasPrefix(h, "Bearer ") {
-		return strings.TrimPrefix(h, "Bearer ")
+		return strings.TrimSpace(strings.TrimPrefix(h, "Bearer "))
 	}
-	return r.URL.Query().Get("token")
+	return ""
 }
 
 // --- Handlers ---
@@ -158,7 +159,7 @@ func extractToken(r *http.Request) string {
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"status":  "ok",
-		"version": "0.1.0",
+		"version": version.Version,
 		"time":    time.Now().UTC(),
 	})
 }
@@ -351,7 +352,29 @@ func (s *Server) handlePush(w http.ResponseWriter, r *http.Request) {
 	if !decodeBody(w, r, &snap) {
 		return
 	}
+	if strings.TrimSpace(snap.Hash) == "" || strings.TrimSpace(snap.Context) == "" {
+		writeError(w, http.StatusBadRequest, "hash and context required")
+		return
+	}
+	if int64(len(snap.Context)) > s.cfg.MaxContextSize {
+		writeError(w, http.StatusRequestEntityTooLarge, "context exceeds configured size limit")
+		return
+	}
+	var contextValue any
+	if err := json.Unmarshal([]byte(snap.Context), &contextValue); err != nil {
+		writeError(w, http.StatusBadRequest, "context must contain valid JSON")
+		return
+	}
 	snap.ProjectID = projectID
+	count, err := s.store.CountSnapshots(projectID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "check snapshot limit failed")
+		return
+	}
+	if count >= s.cfg.MaxSnapshots {
+		writeError(w, http.StatusConflict, "snapshot limit reached")
+		return
+	}
 
 	if err := s.store.PushSnapshot(&snap); err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("push failed: %v", err))

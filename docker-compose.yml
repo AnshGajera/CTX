@@ -7,10 +7,15 @@ services:
       - CTX_DB=/data/ctx-server.db
       - CTX_BIND=0.0.0.0
       - CTX_PORT=3200
-      - CTX_JWT_SECRET=${CTX_JWT_SECRET:-change-me-in-production}
+      - CTX_JWT_SECRET=${CTX_JWT_SECRET:?Set CTX_JWT_SECRET before starting ctx-server}
     volumes:
       - ctx-data:/data
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3200/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   ctx-ml:
     build: ./ctx-ml
@@ -19,6 +24,11 @@ services:
     environment:
       - CTX_EMBED_MODEL=all-MiniLM-L6-v2
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
 volumes:
   ctx-data:

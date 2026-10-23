@@ -14,18 +14,20 @@ import (
 // ServeCommand implements `ctx serve`.
 func ServeCommand() *cli.Command {
 	return &cli.Command{
-		Name:  "serve",
-		Usage: "Serve context over MCP (HTTP or stdio)",
+		Name:    "serve",
+		Aliases: []string{"ui"},
+		Usage:   "Serve context over MCP (HTTP or stdio)",
 		Flags: []cli.Flag{
 			&cli.IntFlag{Name: "port", Value: 3100, Usage: "http port"},
 			&cli.StringFlag{Name: "bind", Value: "127.0.0.1", Usage: "bind address"},
 			&cli.BoolFlag{Name: "stdio", Usage: "MCP over stdio"},
+			&cli.BoolFlag{Name: "mcp", Usage: "compatibility alias for --stdio"},
 			&cli.BoolFlag{Name: "ui", Usage: "print dashboard URL and serve embedded web UI at /ui"},
 		},
 		Action: func(c *cli.Context) error {
 			cwd, _ := os.Getwd()
 			store := versioning.NewContextStore(filepath.Join(cwd, ".ctx"))
-			if c.Bool("stdio") {
+			if c.Bool("stdio") || c.Bool("mcp") {
 				srv := mcp.NewStdioServer(cwd, store)
 				return srv.Serve()
 			}
@@ -34,9 +36,13 @@ func ServeCommand() *cli.Command {
 			srv := mcp.NewMCPServer(cwd, store, port)
 			srv.SetBind(bind)
 			color.Green("Serving MCP on http://%s:%d", bind, port)
-			color.Cyan("Dashboard: http://%s:%d/ui", bind, port)
+			ui := c.Bool("ui") || c.Command.HasName("ui")
+			if ui {
+				srv.SetUIEnabled(true)
+				color.Cyan("Dashboard: http://%s:%d/ui", bind, port)
+			}
 			fmt.Println("APIs: /context/summary, /context/apis, /context/database, /api/history, /api/diff, /api/search?q=")
-			fmt.Println("Cursor: add http://" + bind + ":" + fmt.Sprint(port) + "/mcp as MCP server")
+			fmt.Println("HTTP mode is a REST/debug API; use `ctx serve --stdio` for MCP clients.")
 			fmt.Println("Claude Desktop: use `ctx serve --stdio` in mcpServers config")
 			return srv.Start()
 		},

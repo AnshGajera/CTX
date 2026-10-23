@@ -13,7 +13,7 @@ func ToolDefinitions() []ToolDefinition {
 		return map[string]any{"type": "object", "properties": props, "required": required}
 	}
 	strArr := map[string]any{"type": "array", "items": map[string]any{"type": "string"}}
-	return []ToolDefinition{
+	tools := []ToolDefinition{
 		{
 			Name:        "get_project_context",
 			Description: "Get full or section-filtered project context",
@@ -128,4 +128,16 @@ func ToolDefinitions() []ToolDefinition {
 			}, nil),
 		},
 	}
+	// Keep the names published by the website and older integrations as
+	// compatibility aliases for the canonical CTX tool names.
+	tools = append(tools,
+		ToolDefinition{Name: "ctx_search", Description: "Compatibility alias for search_context", InputSchema: tools[7].InputSchema},
+		ToolDefinition{Name: "ctx_get_schema", Description: "Compatibility alias for get_database_schema", InputSchema: tools[4].InputSchema},
+		ToolDefinition{Name: "ctx_inspect_route", Description: "Inspect an API route by method and path", InputSchema: obj(map[string]any{
+			"method": map[string]any{"type": "string"},
+			"path":   map[string]any{"type": "string"},
+		}, []string{"method", "path"})},
+		ToolDefinition{Name: "ctx_get_env_vars", Description: "Compatibility alias for get_env_requirements", InputSchema: obj(map[string]any{}, nil)},
+	)
+	return tools
 }

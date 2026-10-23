@@ -30,6 +30,7 @@ var (
 	reTSField        = regexp.MustCompile(`^\s*(\w+)([?!]?)\s*:\s*([\w\[\]<>]+)`)
 	rePyClass        = regexp.MustCompile(`^class\s+(\w+)\s*\(([^)]*)\)`)
 	reSqlaColumn     = regexp.MustCompile(`^\s*(\w+)\s*=\s*(?:db\.)?Column\s*\(\s*(\w+)`)
+	reSqlaMapped     = regexp.MustCompile(`^\s*(\w+)\s*:\s*Mapped\[(.*?)\]\s*=\s*mapped_column\s*\((.*?)\)`)
 	reDjangoField    = regexp.MustCompile(`^\s*(\w+)\s*=\s*models\.(\w+)\s*\(`)
 	reGoStruct       = regexp.MustCompile(`^type\s+(\w+)\s+struct\s*\{`)
 	reGoField        = regexp.MustCompile(`^\s*(\w+)\s+([\w\[\]\*\.]+)\s*` + "`" + `([^` + "`" + `]*)` + "`")
@@ -248,7 +249,7 @@ func (e *GenericModelsExtractor) parsePython(path, rel string, db *projctx.Datab
 		name, bases := m[1], m[2]
 		kind := ""
 		switch {
-		case strings.Contains(bases, "db.Model") || strings.Contains(bases, "Base") && strings.Contains(full, "Column"):
+		case strings.Contains(bases, "db.Model") || (strings.Contains(bases, "Base") && (strings.Contains(full, "Column") || strings.Contains(full, "mapped_column"))):
 			kind = "sqlalchemy"
 		case strings.Contains(bases, "models.Model") || strings.Contains(bases, "Model"):
 			// disambiguate django vs sqlalchemy by field syntax below
@@ -261,6 +262,10 @@ func (e *GenericModelsExtractor) parsePython(path, rel string, db *projctx.Datab
 					break
 				}
 				if reSqlaColumn.MatchString(lines[k]) {
+					kind = "sqlalchemy"
+					break
+				}
+				if reSqlaMapped.MatchString(lines[k]) {
 					kind = "sqlalchemy"
 					break
 				}
@@ -283,6 +288,13 @@ func (e *GenericModelsExtractor) parsePython(path, rel string, db *projctx.Datab
 			} else {
 				if fm := reSqlaColumn.FindStringSubmatch(t); len(fm) == 3 {
 					model.Fields = append(model.Fields, projctx.ModelField{Name: fm[1], Type: fm[2]})
+				}
+				if fm := reSqlaMapped.FindStringSubmatch(t); len(fm) == 4 {
+					field := projctx.ModelField{Name: fm[1], Type: strings.TrimSpace(fm[2])}
+					args := strings.ToLower(fm[3])
+					field.PrimaryKey = strings.Contains(args, "primary_key=true")
+					field.Unique = strings.Contains(args, "unique=true")
+					model.Fields = append(model.Fields, field)
 				}
 			}
 		}

@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"strings"
@@ -10,13 +9,14 @@ import (
 	csync "github.com/AnshGajera/CTX/internal/sync"
 	"github.com/fatih/color"
 	"github.com/urfave/cli/v2"
+	"golang.org/x/term"
 )
 
 // ShareCommand implements `ctx share`.
 func ShareCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "share",
-		Usage: "[preview] Create a share token (needs ctx cloud backend)",
+		Usage: "Create a share token",
 		Flags: []cli.Flag{
 			&cli.BoolFlag{Name: "create-token", Usage: "create token via API"},
 			&cli.StringFlag{Name: "name", Usage: "token name"},
@@ -35,8 +35,7 @@ func ShareCommand() *cli.Command {
 			client := csync.NewSyncClient(cfg.Core.APIURL, csync.LoadToken())
 			token, err := client.CreateToken(c.String("name"), c.Bool("read-only"))
 			if err != nil {
-				color.Yellow("Token creation needs a real backend at %s: %v", cfg.Core.APIURL, err)
-				return nil
+				return fmt.Errorf("create share token: %w", err)
 			}
 			color.Green("Token: %s", token)
 			fmt.Printf("curl -H \"Authorization: Bearer %s\" %s/api/v1/projects/<id>/pull\n", token, cfg.Core.APIURL)
@@ -49,7 +48,7 @@ func ShareCommand() *cli.Command {
 func LoginCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "login",
-		Usage: "[preview] Login and store credentials (needs ctx cloud backend; note: interactive password prompt echoes input, no masking)",
+		Usage: "Login and store credentials",
 		Flags: []cli.Flag{
 			&cli.StringFlag{Name: "token", Usage: "store API token directly (skips email/password prompt)"},
 		},
@@ -61,13 +60,20 @@ func LoginCommand() *cli.Command {
 				color.Green("Logged in, credentials stored")
 				return nil
 			}
-			reader := bufio.NewReader(os.Stdin)
+
 			fmt.Print("Email: ")
-			email, _ := reader.ReadString('\n')
-			email = strings.TrimSpace(email)
+			var email string
+			if _, err := fmt.Scanln(&email); err != nil {
+				return fmt.Errorf("read email: %w", err)
+			}
 			fmt.Print("Password: ")
-			password, _ := reader.ReadString('\n')
-			password = strings.TrimSpace(password)
+			passwordBytes, err := term.ReadPassword(int(os.Stdin.Fd()))
+			fmt.Println()
+			if err != nil {
+				return fmt.Errorf("read password: %w", err)
+			}
+			password := strings.TrimSpace(string(passwordBytes))
+
 			cfg := config.Default()
 			if cwd, err := os.Getwd(); err == nil {
 				if loaded, err := config.Load(config.ProjectConfigPath(cwd)); err == nil && loaded.Core.APIURL != "" {

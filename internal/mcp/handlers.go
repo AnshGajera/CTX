@@ -38,11 +38,17 @@ func DispatchToolWithStore(ctx *projctx.ProjectContext, store *versioning.Contex
 	case "get_context_for_file":
 		fp, _ := args["file_path"].(string)
 		return ContextForFile(ctx, fp), nil
-	case "get_api_endpoints":
+	case "get_api_endpoints", "ctx_inspect_route":
 		fp, _ := args["filter_path"].(string)
 		fm, _ := args["filter_method"].(string)
+		if fp == "" {
+			fp, _ = args["path"].(string)
+		}
+		if fm == "" {
+			fm, _ = args["method"].(string)
+		}
 		return FilterEndpoints(ctx, fp, fm), nil
-	case "get_database_schema":
+	case "get_database_schema", "ctx_get_schema":
 		model, _ := args["model_name"].(string)
 		includeDiagram := true
 		if v, ok := args["include_diagram"].(bool); ok {
@@ -51,9 +57,9 @@ func DispatchToolWithStore(ctx *projctx.ProjectContext, store *versioning.Contex
 		return FilterDatabase(ctx, model, includeDiagram), nil
 	case "get_project_conventions":
 		return map[string]any{"file_structure": ctx.FileStructure, "patterns": ctx.Patterns}, nil
-	case "get_env_requirements":
+	case "get_env_requirements", "ctx_get_env_vars":
 		return ctx.Environment, nil
-	case "search_context":
+	case "search_context", "ctx_search":
 		query, _ := args["query"].(string)
 		if strings.TrimSpace(query) == "" {
 			return nil, fmt.Errorf("query is required")

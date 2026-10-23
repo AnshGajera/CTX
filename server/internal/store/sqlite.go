@@ -436,6 +436,15 @@ func (s *SQLiteStore) ListSnapshots(projectID string, limit int) ([]Snapshot, er
 	return snaps, rows.Err()
 }
 
+// CountSnapshots returns the number of snapshots stored for a project.
+func (s *SQLiteStore) CountSnapshots(projectID string) (int, error) {
+	var count int
+	if err := s.db.QueryRow("SELECT COUNT(*) FROM snapshots WHERE project_id = ?", projectID).Scan(&count); err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
 // --- Access control ---
 
 // UserCanAccessProject checks if a user has access to a project.
@@ -458,14 +467,14 @@ func (s *SQLiteStore) UserCanAccessProject(userID, projectID string) (bool, stri
 
 // SharePolicy defines what context sections can be shared with a target team.
 type SharePolicy struct {
-	ID         string    `json:"id"`
-	ProjectID  string    `json:"project_id"`
-	TargetTeam string    `json:"target_team"`
-	Sections   []string  `json:"sections"`
-	Level      string    `json:"level"`
-	CreatedBy  string    `json:"created_by"`
+	ID         string     `json:"id"`
+	ProjectID  string     `json:"project_id"`
+	TargetTeam string     `json:"target_team"`
+	Sections   []string   `json:"sections"`
+	Level      string     `json:"level"`
+	CreatedBy  string     `json:"created_by"`
 	ExpiresAt  *time.Time `json:"expires_at,omitempty"`
-	CreatedAt  time.Time `json:"created_at"`
+	CreatedAt  time.Time  `json:"created_at"`
 }
 
 // CreateSharePolicy creates a sharing policy.

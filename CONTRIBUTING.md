@@ -45,6 +45,11 @@ go build -o ctx ./cmd/ctx
 # Run all Go tests
 go test ./... -race
 
+# Run team-server tests (requires CGO and a C compiler for go-sqlite3)
+cd server
+CGO_ENABLED=1 go test ./... -race
+cd ..
+
 # Run Python tests (optional, for ctx-ml changes)
 pip install -r ctx-ml/requirements.txt
 python -m pytest ctx-ml/tests -q
@@ -130,7 +135,7 @@ test(sync): add integration tests for push/pull
 ## Pull Request Process
 
 1. **Update tests** — All PRs must include relevant tests
-2. **Run checks locally** — `go test ./... -race && go vet ./...`
+2. **Run checks locally** — `go test ./... -race`, `cd server && CGO_ENABLED=1 go test ./... -race`, and `go vet ./...`
 3. **One concern per PR** — Keep PRs focused and reviewable
 4. **Describe the change** — Use the PR template; explain *why*, not just *what*
 5. **Screenshots for UI changes** — If you change TUI output, include before/after

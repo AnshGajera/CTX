@@ -90,10 +90,42 @@ func (d *Detector) Detect() (*projctx.ProjectProfile, error) {
 		profile.Languages = mergeLanguages(profile.Languages, dist)
 	}
 	profile.EntryPoints = d.findEntryPoints()
-	if profile.ProjectType == "" {
+	hasFrontend, hasBackend := false, false
+	for _, f := range profile.Frameworks {
+		if strings.EqualFold(f.Type, "frontend") {
+			hasFrontend = true
+		}
+		if strings.EqualFold(f.Type, "backend") || strings.EqualFold(f.Type, "api") {
+			hasBackend = true
+		}
+	}
+	if hasFrontend && hasBackend {
+		profile.ProjectType = "web_application"
+	} else if profile.ProjectType == "" {
 		profile.ProjectType = inferProjectType(profile)
 	}
+
 	return profile, nil
+}
+
+func findManifestFiles(root string, names map[string]bool) []string {
+	var out []string
+	_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info == nil {
+			return nil
+		}
+		if info.IsDir() {
+			if skipDirs[info.Name()] {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if names[strings.ToLower(info.Name())] {
+			out = append(out, path)
+		}
+		return nil
+	})
+	return out
 }
 
 func mergeLanguages(a, b []projctx.Language) []projctx.Language {

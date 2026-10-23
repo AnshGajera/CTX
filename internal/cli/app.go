@@ -23,6 +23,7 @@ func NewApp() *cli.App {
 			commands.StatusCommand(),
 			commands.PushCommand(),
 			commands.PullCommand(),
+			commands.TeamCommand(),
 			commands.DiffCommand(),
 			commands.LogCommand(),
 			commands.BranchCommand(),
