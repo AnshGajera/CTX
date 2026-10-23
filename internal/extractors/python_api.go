@@ -54,6 +54,9 @@ func (e *PythonAPIExtractor) Extract(ctx *projctx.ProjectContext) error {
 		for sc.Scan() {
 			lines = append(lines, sc.Text())
 		}
+		if err := sc.Err(); err != nil {
+			return nil
+		}
 		var pending []pythonRoute
 		for index, line := range lines {
 			lineNo := index + 1

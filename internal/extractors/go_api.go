@@ -74,6 +74,9 @@ func (e *GoAPIExtractor) Extract(ctx *projctx.ProjectContext) error {
 				}
 			}
 		}
+		if err := sc.Err(); err != nil {
+			return nil
+		}
 		return nil
 	})
 	if len(endpoints) == 0 {

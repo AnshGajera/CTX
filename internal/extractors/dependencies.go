@@ -290,6 +290,9 @@ func (e *DependencyExtractor) extractGo(dc *projctx.DependencyContext) {
 			}
 		}
 	}
+	if err := sc.Err(); err != nil {
+		return
+	}
 }
 
 func (e *DependencyExtractor) extractPython(dc *projctx.DependencyContext) {

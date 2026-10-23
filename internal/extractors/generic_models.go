@@ -137,9 +137,13 @@ func (e *GenericModelsExtractor) parseJS(path, rel string, db *projctx.DatabaseC
 		no++
 		lines = append(lines, line{no, sc.Text()})
 	}
+	if err := sc.Err(); err != nil {
+		return
+	}
 	var fullB strings.Builder
 	for _, l := range lines {
-		fullB.WriteString(l.text + "\n")
+		fullB.WriteString(l.text)
+		fullB.WriteByte('\n')
 	}
 	full := fullB.String()
 	isMongoose := strings.Contains(full, "mongoose") || reMongooseSchema.MatchString(full)
@@ -240,6 +244,9 @@ func (e *GenericModelsExtractor) parsePython(path, rel string, db *projctx.Datab
 	for sc.Scan() {
 		lines = append(lines, sc.Text())
 	}
+	if err := sc.Err(); err != nil {
+		return
+	}
 	full := strings.Join(lines, "\n")
 	for i, l := range lines {
 		m := rePyClass.FindStringSubmatch(l)
@@ -314,6 +321,9 @@ func (e *GenericModelsExtractor) parseGo(path, rel string, db *projctx.DatabaseC
 	for sc.Scan() {
 		lines = append(lines, sc.Text())
 	}
+	if err := sc.Err(); err != nil {
+		return
+	}
 	for i, l := range lines {
 		m := reGoStruct.FindStringSubmatch(l)
 		if len(m) != 2 {
@@ -376,18 +386,30 @@ func genericMermaid(models []projctx.DatabaseModel, rels []projctx.Relation) str
 	var b strings.Builder
 	b.WriteString("erDiagram\n")
 	for _, m := range models {
-		b.WriteString("  " + m.Name + " {\n")
+		b.WriteString("  ")
+		b.WriteString(m.Name)
+		b.WriteString(" {\n")
 		for _, f := range m.Fields {
 			if f.Reference != "" {
 				continue
 			}
 			typ := strings.ReplaceAll(strings.ReplaceAll(f.Type, " ", "_"), ":", "_")
-			b.WriteString("    " + typ + " " + f.Name + "\n")
+			b.WriteString("    ")
+			b.WriteString(typ)
+			b.WriteByte(' ')
+			b.WriteString(f.Name)
+			b.WriteByte('\n')
 		}
 		b.WriteString("  }\n")
 	}
 	for _, r := range rels {
-		b.WriteString("  " + r.From + " ||--o{ " + r.To + " : \"" + r.FieldName + "\"\n")
+		b.WriteString("  ")
+		b.WriteString(r.From)
+		b.WriteString(" ||--o{ ")
+		b.WriteString(r.To)
+		b.WriteString(" : \"")
+		b.WriteString(r.FieldName)
+		b.WriteString("\"\n")
 	}
 	return b.String()
 }

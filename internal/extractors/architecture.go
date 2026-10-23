@@ -172,6 +172,9 @@ func (e *ArchitectureExtractor) parseComposeServices() ([]projctx.ServiceDefinit
 			}
 		}
 	}
+	if err := sc.Err(); err != nil {
+		return nil, nil
+	}
 	var out []projctx.ServiceDefinition
 	var edges []projctx.CommPattern
 	for _, s := range svcs {
@@ -207,14 +210,26 @@ func mermaidFlow(layers []projctx.ArchLayer, services []projctx.ServiceDefinitio
 	}
 	for _, l := range layers {
 		id := "L_" + safe(l.Name)
-		b.WriteString("  " + id + "[" + l.Name + "]\n")
+		b.WriteString("  ")
+		b.WriteString(id)
+		b.WriteString("[")
+		b.WriteString(l.Name)
+		b.WriteString("]\n")
 	}
 	for _, s := range services {
 		id := "S_" + safe(s.Name)
-		b.WriteString("  " + id + "((" + s.Name + "))\n")
+		b.WriteString("  ")
+		b.WriteString(id)
+		b.WriteString("((")
+		b.WriteString(s.Name)
+		b.WriteString("))\n")
 	}
 	for _, e := range edges {
-		b.WriteString("  S_" + safe(e.From) + " --> S_" + safe(e.To) + "\n")
+		b.WriteString("  S_")
+		b.WriteString(safe(e.From))
+		b.WriteString(" --> S_")
+		b.WriteString(safe(e.To))
+		b.WriteString("\n")
 	}
 	return b.String()
 }

@@ -23,13 +23,10 @@ func NewGraphQL(root string) *GraphQLExtractor {
 func (e *GraphQLExtractor) Name() string { return "graphql" }
 
 var (
-	gqlTypeRe         = regexp.MustCompile(`(?i)^\s*type\s+(\w+)\s*(\{|@|implements)`)
 	gqlFieldRe        = regexp.MustCompile(`^\s+(\w+)\s*(?:\([^)]*\))?\s*:\s*(.+)`)
 	gqlQueryRe        = regexp.MustCompile(`(?i)^\s*type\s+Query\s*\{`)
 	gqlMutationRe     = regexp.MustCompile(`(?i)^\s*type\s+Mutation\s*\{`)
 	gqlSubscriptionRe = regexp.MustCompile(`(?i)^\s*type\s+Subscription\s*\{`)
-	gqlInputRe        = regexp.MustCompile(`(?i)^\s*input\s+(\w+)\s*\{`)
-	gqlEnumRe         = regexp.MustCompile(`(?i)^\s*enum\s+(\w+)\s*\{`)
 	gqlResolverRe     = regexp.MustCompile(`(?i)(Query|Mutation|Subscription)\s*:\s*\{`)
 )
 
@@ -49,7 +46,7 @@ func (e *GraphQLExtractor) Extract(ctx *projctx.ProjectContext) error {
 		defer f.Close()
 
 		sc := bufio.NewScanner(f)
-		inBlock := ""     // "query", "mutation", "subscription", ""
+		inBlock := "" // "query", "mutation", "subscription", ""
 		braceDepth := 0
 
 		for sc.Scan() {
@@ -81,9 +78,10 @@ func (e *GraphQLExtractor) Extract(ctx *projctx.ProjectContext) error {
 
 				if m := gqlFieldRe.FindStringSubmatch(line); len(m) >= 3 {
 					method := "QUERY"
-					if inBlock == "mutation" {
+					switch inBlock {
+					case "mutation":
 						method = "MUTATION"
-					} else if inBlock == "subscription" {
+					case "subscription":
 						method = "SUBSCRIPTION"
 					}
 
@@ -95,6 +93,9 @@ func (e *GraphQLExtractor) Extract(ctx *projctx.ProjectContext) error {
 					})
 				}
 			}
+		}
+		if err := sc.Err(); err != nil {
+			return nil
 		}
 		return nil
 	})

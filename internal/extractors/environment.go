@@ -194,4 +194,7 @@ func (e *EnvironmentExtractor) parseEnvExample(path string, vars map[string]*pro
 		}
 		lastComment = ""
 	}
+	if err := sc.Err(); err != nil {
+		return
+	}
 }
