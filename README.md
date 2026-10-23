@@ -2,6 +2,9 @@
 
 > Git for Context, not Code. Extract structured project context (architecture, APIs, DB schemas, deps, env, patterns) and serve it to AI tools via MCP. Hybrid TF-IDF + MiniLM retrieval for RAG. Local dashboard, health scoring, and a self-hosted team server included.
 
+**New users:** follow the [CTX User Guide](./USER_GUIDE.md) for installation,
+first-project setup, AI/MCP integration, optional ML services, and daily usage.
+
 ## Install
 
 ```bash

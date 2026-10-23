@@ -10,6 +10,9 @@ type ToolDefinition struct {
 // ToolDefinitions lists all tools.
 func ToolDefinitions() []ToolDefinition {
 	obj := func(props map[string]any, required []string) map[string]any {
+		if required == nil {
+			required = []string{}
+		}
 		return map[string]any{"type": "object", "properties": props, "required": required}
 	}
 	strArr := map[string]any{"type": "array", "items": map[string]any{"type": "string"}}
