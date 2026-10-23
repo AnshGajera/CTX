@@ -3,134 +3,64 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>CTX Dashboard</title>
+<title>CTX · Project intelligence</title>
 <style>
-:root{--bg:#0b1220;--panel:#111a2e;--border:#1e2a45;--txt:#dbe4f5;--dim:#8ea0c2;--acc:#38bdf8;--ok:#34d399;--warn:#fbbf24;--bad:#f87171}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.5 system-ui,Segoe UI,Roboto,sans-serif}
-header{position:sticky;top:0;background:#0b1220ee;border-bottom:1px solid var(--border);padding:12px 18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-header h1{font-size:16px;margin:0}header h1 span{color:var(--acc)}
-.pill{border:1px solid var(--border);border-radius:20px;padding:2px 10px;color:var(--dim);font-size:12px}
-button{background:#1a2742;color:var(--txt);border:1px solid var(--border);border-radius:8px;padding:6px 12px;cursor:pointer}
-button:hover{border-color:var(--acc)}
-main{max-width:1100px;margin:0 auto;padding:18px}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:14px 0}
-.card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px}
-.card b{font-size:22px;display:block}.card span{color:var(--dim);font-size:12px}
-nav{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
-nav button.active{background:var(--acc);color:#04202e;border-color:var(--acc);font-weight:700}
-section.panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:10px}
-table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--border)}
-th{color:var(--dim);font-weight:600}code{background:#0a0f1f;padding:1px 6px;border-radius:6px;border:1px solid var(--border)}
-input,select{background:#0a0f1f;color:var(--txt);border:1px solid var(--border);border-radius:8px;padding:7px 10px}
-.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
-pre{background:#0a0f1f;border:1px solid var(--border);border-radius:8px;padding:10px;overflow:auto;max-height:380px;font-size:12px}
-.add{color:var(--ok)}.del{color:var(--bad)}.dim{color:var(--dim)}
-a{color:var(--acc)}
+:root{--bg:#080d18;--surface:#0e1627;--surface-2:#121d31;--surface-3:#17243b;--line:#223250;--text:#e7eefb;--muted:#8ea1bf;--blue:#62b6ff;--blue-2:#2678d4;--green:#55d6a0;--amber:#f6c96b;--red:#ff7f8c;--shadow:0 18px 45px #02061155}
+*{box-sizing:border-box}html{background:var(--bg)}body{margin:0;color:var(--text);font:14px/1.55 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:.01em}
+button,input,select{font:inherit}button{cursor:pointer}
+.app{min-height:100vh;display:grid;grid-template-columns:252px minmax(0,1fr)}
+.sidebar{background:#0a111f;border-right:1px solid var(--line);padding:25px 16px;display:flex;flex-direction:column;gap:28px}
+.brand{display:flex;align-items:center;gap:11px;padding:0 10px}.brand-mark{width:32px;height:32px;border-radius:10px;background:linear-gradient(145deg,#5cc7ff,#2673d3);display:grid;place-items:center;color:#061120;font-weight:900;font-size:17px;box-shadow:0 8px 20px #2789e944}.brand strong{font-size:18px;letter-spacing:.08em}.brand small{display:block;color:var(--muted);font-size:10px;letter-spacing:.13em;text-transform:uppercase}
+.side-label{color:#607594;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;padding:0 11px;margin-bottom:7px}.nav{display:grid;gap:4px}.nav button{border:1px solid transparent;background:transparent;color:var(--muted);border-radius:9px;text-align:left;padding:10px 11px;display:flex;align-items:center;gap:11px;transition:.18s}.nav button:hover{color:var(--text);background:var(--surface)}.nav button.active{color:var(--text);background:linear-gradient(90deg,#17345a,#12233d);border-color:#27578a;box-shadow:inset 3px 0 var(--blue)}.nav svg{width:16px;height:16px;opacity:.8}
+.sidebar-foot{margin-top:auto;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:13px;color:var(--muted);font-size:12px}.local-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 4px #55d6a01c;margin-right:8px}
+.main{min-width:0}.topbar{height:76px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:14px;padding:0 clamp(20px,4vw,48px);background:#0b1220dd;backdrop-filter:blur(16px);position:sticky;top:0;z-index:5}.crumb{min-width:0}.eyebrow{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.14em;font-weight:700}.project-name{font-weight:700;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:35vw}.top-actions{margin-left:auto;display:flex;gap:8px;align-items:center}.icon-btn,.primary{border:1px solid var(--line);color:var(--text);background:var(--surface-2);border-radius:8px;padding:8px 12px}.icon-btn:hover{border-color:var(--blue);color:var(--blue)}.primary{background:var(--blue-2);border-color:#4599e8;font-weight:700}.primary:hover{background:#3188e4}.main-content{max-width:1500px;margin:0 auto;padding:34px clamp(20px,4vw,48px) 45px}
+.hero{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;margin-bottom:28px}.hero h1{font-size:31px;line-height:1.15;margin:7px 0 8px;letter-spacing:-.035em}.hero p{margin:0;color:var(--muted);max-width:650px}.hero-meta{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.badge{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 10px;color:var(--muted);font-size:12px;white-space:nowrap}.badge strong{color:var(--text);font-weight:600}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:25px}.stat{background:linear-gradient(140deg,var(--surface-2),var(--surface));border:1px solid var(--line);border-radius:13px;padding:17px 18px;box-shadow:var(--shadow);position:relative;overflow:hidden}.stat:after{content:"";position:absolute;width:80px;height:80px;border-radius:50%;right:-32px;bottom:-44px;background:#2678d415}.stat-label{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.09em}.stat-value{font-size:28px;font-weight:750;letter-spacing:-.04em;margin-top:7px}.stat-foot{color:var(--muted);font-size:12px;margin-top:3px}.stat-foot.ok{color:var(--green)}
+.content-grid{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(280px,.6fr);gap:15px}.panel{background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:20px;min-width:0;box-shadow:0 10px 30px #02061122}.panel-wide{grid-column:1/-1}.panel-head{display:flex;justify-content:space-between;align-items:flex-start;gap:15px;margin-bottom:16px}.panel h2{font-size:16px;margin:0;letter-spacing:-.01em}.panel-sub{color:var(--muted);font-size:12px;margin:4px 0 0}.health-score{display:flex;align-items:center;gap:14px}.score-ring{width:62px;height:62px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--green) var(--score),#1d2b43 0);position:relative}.score-ring:after{content:"";position:absolute;inset:6px;border-radius:50%;background:var(--surface)}.score-ring b{position:relative;z-index:1;font-size:16px}.health-copy b{display:block;font-size:13px}.health-copy span{color:var(--muted);font-size:12px}
+.info-list{display:grid;gap:0}.info-row{display:flex;justify-content:space-between;gap:20px;padding:11px 0;border-bottom:1px solid #1d2a42}.info-row:last-child{border-bottom:0}.info-row span{color:var(--muted)}.info-row strong{text-align:right;font-weight:600}
+.activity{display:grid;gap:12px}.activity-item{display:flex;gap:11px;align-items:flex-start}.activity-dot{width:8px;height:8px;border-radius:50%;background:var(--blue);margin-top:7px;box-shadow:0 0 0 4px #62b6ff18}.activity-item b{font-size:13px;display:block}.activity-item span{font-size:12px;color:var(--muted)}
+.view-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:17px}.view-title h2{font-size:19px}.toolbar{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:14px}input,select{background:#09111f;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:9px 11px;outline:none}input:focus,select:focus{border-color:var(--blue);box-shadow:0 0 0 3px #62b6ff16}input{min-width:180px}.search-input{flex:1;min-width:220px}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:11px 10px;border-bottom:1px solid #1d2a42;vertical-align:top}th{color:#7890b3;font-size:11px;text-transform:uppercase;letter-spacing:.08em;font-weight:700}tbody tr:hover{background:#142039}.method{font-size:11px;font-weight:800;border-radius:5px;padding:3px 7px;display:inline-block}.GET{color:#63dda8;background:#55d6a012}.POST{color:#70bfff;background:#62b6ff12}.PUT,.PATCH{color:var(--amber);background:#f6c96b12}.DELETE{color:var(--red);background:#ff7f8c12}code{background:#09111f;color:#a8caef;border:1px solid #203454;border-radius:5px;padding:3px 6px;font-size:12px}pre{background:#09111f;border:1px solid var(--line);border-radius:9px;padding:14px;overflow:auto;max-height:360px;font-size:12px;color:#a9bad4}.muted,.dim{color:var(--muted)}.empty{padding:28px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:9px}.empty code{display:inline-block;margin-top:8px}
+details{border:1px solid var(--line);border-radius:9px;margin:9px 0;overflow:hidden}summary{padding:12px 14px;cursor:pointer;list-style:none;background:#111c30}summary::-webkit-details-marker{display:none}summary:before{content:"＋";color:var(--blue);margin-right:8px}details[open] summary:before{content:"－"}details table{margin:0 10px 10px;width:calc(100% - 20px)}.change-add{color:var(--green)}.change-del{color:var(--red)}.result{padding:12px 0;border-bottom:1px solid #1d2a42}.result:last-child{border-bottom:0}.result b{font-size:13px}.result p{margin:5px 0 0;color:#bdcbe0}
+.footer{color:#647896;font-size:12px;text-align:center;margin-top:24px}.footer code{color:#8499b6}
+@media(max-width:900px){.app{grid-template-columns:1fr}.sidebar{position:static;padding:14px 18px;border-right:0;border-bottom:1px solid var(--line);gap:14px}.sidebar .nav{display:flex;overflow:auto}.sidebar .side-label,.sidebar-foot{display:none}.nav button{white-space:nowrap}.main-content{padding-top:24px}.content-grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}.topbar{height:66px}.hero{align-items:flex-start;flex-direction:column}.hero-meta{justify-content:flex-start}}
+@media(max-width:520px){.stats{grid-template-columns:1fr 1fr;gap:8px}.stat{padding:13px}.stat-value{font-size:24px}.project-name{max-width:45vw}.top-actions .icon-btn{font-size:0;padding:9px}.top-actions .icon-btn:first-child:before{content:"↻";font-size:16px}.main-content{padding-left:14px;padding-right:14px}.panel{padding:15px}th,td{padding:9px 6px}.hero h1{font-size:26px}}
 </style>
 </head>
 <body>
-<header>
-<h1><span>CTX</span> dashboard</h1>
-<span class="pill" id="p-project">…</span>
-<span class="pill" id="p-branch">…</span>
-<span class="pill" id="p-hash">…</span>
-<span class="pill" id="p-fresh">…</span>
-<span style="flex:1"></span>
-<button onclick="loadAll()">Refresh</button>
-<a href="/context" target="_blank"><button>JSON</button></a>
-</header>
-<main>
-<div class="cards" id="cards"></div>
-<nav id="tabs">
-<button data-t="overview" class="active">Overview</button>
-<button data-t="apis">APIs</button>
-<button data-t="schema">Schema</button>
-<button data-t="env">Env</button>
-<button data-t="deps">Deps</button>
-<button data-t="history">History &amp; Diff</button>
-<button data-t="search">Search</button>
-</nav>
-<section class="panel" id="view"></section>
-<p class="dim">Local-first viewer. Data from <code>/context/*</code> + <code>/api/history</code> + <code>/api/diff</code> + <code>/api/search</code>. No data leaves localhost.</p>
-</main>
+<div class="app">
+<aside class="sidebar">
+  <div class="brand"><div class="brand-mark">C</div><div><strong>CTX</strong><small>Context intelligence</small></div></div>
+  <div><div class="side-label">Workspace</div><nav class="nav" id="tabs">
+    <button data-t="overview" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Overview</button>
+    <button data-t="apis"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>API catalog</button>
+    <button data-t="schema"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v7c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12v7c0 1.7 3.6 3 8 3s8-1.3 8-3v-7"/></svg>Data models</button>
+    <button data-t="env"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16v14H4zM8 9h8M8 13h5"/></svg>Environment</button>
+    <button data-t="deps"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 7V5a3 3 0 0 1 6 0v2M7 7h10v12H7zM4 11h3m10 0h3"/></svg>Dependencies</button>
+    <button data-t="history"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h5M5 15a8 8 0 1 0 1-8L4 9"/></svg>History &amp; diff</button>
+    <button data-t="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/></svg>Search context</button>
+  </nav></div>
+  <div class="sidebar-foot"><span class="local-dot"></span><strong>Local-first</strong><br><span>Project intelligence stays on this machine.</span></div>
+</aside>
+<main class="main">
+<header class="topbar"><div class="crumb"><div class="eyebrow">Project workspace</div><div class="project-name" id="top-project">Loading project…</div></div><div class="top-actions"><button class="icon-btn" onclick="loadAll()">↻ Refresh</button><a href="/context" target="_blank"><button class="icon-btn">View JSON</button></a></div></header>
+<div class="main-content">
+<section class="hero"><div><div class="eyebrow">Project intelligence dashboard</div><h1>Understand your codebase faster.</h1><p>Architecture, APIs, data models, dependencies and conventions in one local workspace.</p></div><div class="hero-meta"><span class="badge">Branch <strong id="p-branch">—</strong></span><span class="badge">Snapshot <strong id="p-hash">—</strong></span><span class="badge">Freshness <strong id="p-fresh">—</strong></span></div></section>
+<section class="stats" id="cards"></section>
+<div id="view"></div>
+<p class="footer">CTX runs locally · Data from <code>/context/*</code>, <code>/api/history</code>, <code>/api/diff</code> and <code>/api/search</code></p>
+</div></main></div>
 <script>
-const $=s=>document.querySelector(s);
-let CACHE={summary:null,apis:null,db:null,env:null,deps:null,ctx:null,history:null,diff:null};
-let tab="overview";
-document.querySelectorAll("#tabs button").forEach(b=>b.onclick=()=>{tab=b.dataset.t;document.querySelectorAll("#tabs button").forEach(x=>x.classList.remove("active"));b.classList.add("active");render();});
-async function j(u,o){const r=await fetch(u,o);if(!r.ok)throw new Error(u+" -> "+r.status);return r.json();}
-async function loadAll(){
-try{
-CACHE.summary=await j("/context/summary");
-$("#p-project").textContent=CACHE.summary.project||"?";
-$("#p-branch").textContent=CACHE.summary.branch||"no git";
-$("#p-hash").textContent=(CACHE.summary.hash||"").slice(0,12)||"no hash";
-const h=CACHE.summary.health||{};$("#p-fresh").textContent=(CACHE.summary.staleness||"?")+("score" in h?(" · "+h.score+"/100 "+(h.grade||"")):"");
-const c=CACHE.summary.counts||{};
-$("#cards").innerHTML=["endpoints","models","env_vars","dependencies"].map(k=>`<div class=card><b>${c[k]??"–"}</b><span>${k.replace("_"," ")}</span></div>`).join("");
-CACHE.ctx=await j("/context").catch(()=>null);
-CACHE.apis=await j("/context/apis").catch(()=>null);
-CACHE.db=await j("/context/database").catch(()=>null);
-CACHE.env=await j("/context/env").catch(()=>null);
-CACHE.deps=await j("/context/dependencies").catch(()=>null);
-CACHE.history=await j("/api/history").catch(()=>null);
-CACHE.diff=await j("/api/diff").catch(()=>null);
-}catch(e){$("#view").innerHTML="<b>Load failed:</b> "+e+"<br><span class=dim>Run <code>ctx extract</code> first, then <code>ctx serve --ui</code> in the project root.</span>";return;}
-render();
-}
-function esc(s){return String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
-function render(){
-const v=$("#view");
-if(tab==="overview"){
-const s=CACHE.summary||{};const langs=(s.languages||[]).map(l=>esc(l.name)+" "+(l.percentage||0).toFixed(0)+"%").join(", ")||"–";
-const fws=(s.frameworks||[]).map(f=>esc(f.name)).join(", ")||"–";
-const a=CACHE.ctx&&CACHE.ctx.architecture?CACHE.ctx.architecture.pattern||"–":"–";
-v.innerHTML=`<h3>Overview</h3><table>
-<tr><th>Project</th><td>${esc(s.project||"")}</td></tr>
-<tr><th>Type</th><td>${esc(s.type||"")}</td></tr>
-<tr><th>Languages</th><td>${langs}</td></tr>
-<tr><th>Frameworks</th><td>${fws}</td></tr>
-<tr><th>Architecture</th><td>${esc(a)}</td></tr>
-<tr><th>Diagram</th><td><pre>${esc(CACHE.ctx&&CACHE.ctx.architecture&&CACHE.ctx.architecture.diagram||"no diagram")}</pre></td></tr></table>`;
-}else if(tab==="apis"){
-const eps=(CACHE.apis&&CACHE.apis.endpoints)||[];
-v.innerHTML=`<h3>Endpoints (${eps.length})</h3>
-<div class=toolbar><input id=f-path placeholder="filter path… e.g. /users" oninput="drawAPIs()"><select id=f-method onchange="drawAPIs()"><option value="">all methods</option><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option><option>ALL</option></select></div>
-<div id=api-table></div>`;
-drawAPIs();
-}else if(tab==="schema"){
-const m=(CACHE.db&&CACHE.db.models)||[];
-v.innerHTML=`<h3>Models (${m.length})</h3>`+m.map(x=>`<details><summary><code>${esc(x.name)}</code> <span class=dim>${esc(x.table||"")} · ${esc(x.file||"")}</span></summary><table><tr><th>field</th><th>type</th><th>flags</th></tr>${(x.fields||[]).map(f=>`<tr><td><code>${esc(f.name)}</code></td><td>${esc(f.type)}</td><td class=dim>${[f.primary_key?"PK":"",f.unique?"UQ":"",f.nullable?"null":"",f.reference?("→ "+f.reference):""].filter(Boolean).join(" ")}</td></tr>`).join("")}</table></details>`).join("")+`<h3>ER diagram</h3><pre>${esc(CACHE.db&&CACHE.db.diagram||"no diagram")}</pre>`;
-}else if(tab==="env"){
-const vs=(CACHE.env&&CACHE.env.variables)||[];
-v.innerHTML=`<h3>Env vars (${vs.length}) — names only, values never stored</h3><table><tr><th>name</th><th>required</th><th>category</th><th>default</th></tr>${vs.map(x=>`<tr><td><code>${esc(x.name)}</code></td><td>${x.required?"yes":"no"}</td><td>${esc(x.category||"")}</td><td class=dim>${esc(x.default||"")}</td></tr>`).join("")}</table>`;
-}else if(tab==="deps"){
-const d=(CACHE.deps&&CACHE.deps.direct)||[];
-v.innerHTML=`<h3>Dependencies (${d.length})</h3><table><tr><th>name</th><th>version</th><th>category</th></tr>${d.map(x=>`<tr><td>${esc(x.name)}</td><td class=dim>${esc(x.version||"")}</td><td>${esc(x.category||"")}</td></tr>`).join("")}</table>`;
-}else if(tab==="history"){
-const h=(CACHE.history&&CACHE.history.snapshots)||[];const diff=CACHE.diff||{};
-v.innerHTML=`<h3>Diff HEAD</h3><p>${esc(diff.summary||"no diff")}</p>
-<p class=add>${(diff.added_endpoints||[]).map(e=>"+ "+esc(e.method)+" "+esc(e.path)).join("<br>")}</p>
-<p class=del>${(diff.removed_endpoints||[]).map(e=>"- "+esc(e.method)+" "+esc(e.path)).join("<br>")}</p>
-<p class=add>${(diff.added_models||[]).map(e=>"+ model "+esc(e.name)).join("<br>")}</p>
-<p class=del>${(diff.removed_models||[]).map(e=>"- model "+esc(e.name)).join("<br>")}</p>
-<h3>History (${h.length})</h3><table><tr><th>hash</th><th>time</th><th>author</th><th>message</th><th>git</th></tr>${h.map(s=>`<tr><td><code>${esc((s.hash||"").slice(0,12))}</code></td><td class=dim>${esc(s.timestamp||"")}</td><td>${esc(s.author||"")}</td><td>${esc(s.message||"")}</td><td class=dim>${esc(s.git_branch||"")} ${esc((s.git_commit||"").slice(0,7))}</td></tr>`).join("")}</table>`;
-}else if(tab==="search"){
-v.innerHTML=`<h3>Search context</h3><div class=toolbar><input id=q style="flex:1" placeholder="e.g. where is auth handled?"><button onclick="doSearch()">Search</button></div><div id=results class=dim>Type a query, backed by <code>GET /api/search?q=</code> (TF-IDF, offline).</div>`;
-}
-}
-function drawAPIs(){
-const fp=($("#f-path")||{}).value||"";const fm=($("#f-method")||{}).value||"";
-const eps=((CACHE.apis&&CACHE.apis.endpoints)||[]).filter(e=>(!fp||e.path.toLowerCase().includes(fp.toLowerCase()))&&(!fm||e.method===fm));
-$("#api-table").innerHTML=`<table><tr><th>method</th><th>path</th><th>file</th><th>auth</th></tr>${eps.map(e=>`<tr><td><code>${esc(e.method)}</code></td><td><code>${esc(e.path)}</code></td><td class=dim>${esc(e.file||"")}${e.line?":"+e.line:""}</td><td>${e.auth_required?"🔒":""}</td></tr>`).join("")}</table>`;
-}
-async function doSearch(){
-const q=$("#q").value.trim();if(!q)return;
-$("#results").textContent="Searching…";
-try{const r=await j("/api/search?q="+encodeURIComponent(q));
-$("#results").innerHTML=(r.results||[]).map((x,i)=>`<p><b>${i+1}. [${esc(x.kind)}] ${esc(x.id)}</b> <span class=dim>${(x.score||0).toFixed(3)} · ${esc(x.source||"")}</span><br>${esc((x.text||"").slice(0,300))}</p>`).join("")||"No results.";}
-catch(e){$("#results").textContent="Search failed: "+e;}
-}
+const $=s=>document.querySelector(s);let CACHE={summary:null,apis:null,db:null,env:null,deps:null,ctx:null,history:null,diff:null},tab="overview";
+document.querySelectorAll("#tabs button").forEach(b=>b.onclick=()=>{tab=b.dataset.t;document.querySelectorAll("#tabs button").forEach(x=>x.classList.toggle("active",x===b));render()});
+async function j(u,o){const r=await fetch(u,o);if(!r.ok)throw new Error(u+" -> "+r.status);return r.json()}
+async function loadAll(){try{CACHE.summary=await j("/context/summary");const s=CACHE.summary||{};$("#top-project").textContent=s.project||"Unnamed project";$("#p-branch").textContent=s.branch||"no git";$("#p-hash").textContent=(s.hash||"").slice(0,12)||"no hash";const h=s.health||{};$("#p-fresh").textContent=(s.staleness||"unknown")+("score"in h?" · "+h.score+"/100":"");const c=s.counts||{};$("#cards").innerHTML=[["endpoints","API endpoints","Routes discovered"],["models","Data models","Schema entities"],["env_vars","Environment","Variable names"],["dependencies","Dependencies","Direct packages"]].map(x=>`<article class="stat"><div class="stat-label">${x[1]}</div><div class="stat-value">${c[x[0]]??"—"}</div><div class="stat-foot">${x[2]}</div></article>`).join("");CACHE.ctx=await j("/context").catch(()=>null);CACHE.apis=await j("/context/apis").catch(()=>null);CACHE.db=await j("/context/database").catch(()=>null);CACHE.env=await j("/context/env").catch(()=>null);CACHE.deps=await j("/context/dependencies").catch(()=>null);CACHE.history=await j("/api/history").catch(()=>null);CACHE.diff=await j("/api/diff").catch(()=>null)}catch(e){$("#view").innerHTML=`<section class="panel"><b>Unable to load project context</b><p class="muted">${esc(e)}</p><p class="muted">Run <code>ctx extract</code>, then restart <code>ctx serve --ui</code> from the project root.</p></section>`;return}render()}
+function esc(s){return String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+function empty(text){return `<div class="empty">${text}</div>`}
+function panel(title,sub,body,wide=false){return `<section class="panel${wide?" panel-wide":""}"><div class="view-title"><div><h2>${title}</h2>${sub?`<p class="panel-sub">${sub}</p>`:""}</div></div>${body}</section>`}
+function render(){const v=$("#view"),s=CACHE.summary||{};if(tab==="overview"){const langs=(s.languages||[]).map(l=>esc(l.name)+" "+(l.percentage||0).toFixed(0)+"%").join(", ")||"—",fws=(s.frameworks||[]).map(f=>esc(f.name)).join(", ")||"—",a=CACHE.ctx?.architecture?.pattern||"—",h=s.health||{};v.innerHTML=`<div class="content-grid">${panel("Project profile","A high-level view of the detected stack.",`<div class="info-list"><div class="info-row"><span>Project type</span><strong>${esc(s.type||"—")}</strong></div><div class="info-row"><span>Languages</span><strong>${langs}</strong></div><div class="info-row"><span>Frameworks</span><strong>${fws}</strong></div><div class="info-row"><span>Architecture</span><strong>${esc(a)}</strong></div></div>`)}${panel("Context health","Quality and freshness of the current snapshot.",`<div class="health-score"><div class="score-ring" style="--score:${h.score||0}%"><b>${h.score??"—"}</b></div><div class="health-copy"><b>${esc(h.grade?"Grade "+h.grade:"No score")}</b><span>${esc(s.staleness||"Freshness unavailable")}</span></div></div><div style="margin-top:20px" class="muted">Keep context fresh after meaningful code changes with <code>ctx extract</code>.</div>`)}${panel("Architecture map","Detected project structure and relationships.",`<pre>${esc(CACHE.ctx?.architecture?.diagram||"No architecture diagram detected.")}</pre>`,true)}</div>`}else if(tab==="apis"){const eps=CACHE.apis?.endpoints||[];v.innerHTML=panel("API catalog",`${eps.length} endpoints discovered in the project.`,`<div class="toolbar"><input id="f-path" placeholder="Filter by path…" oninput="drawAPIs()"><select id="f-method" onchange="drawAPIs()"><option value="">All methods</option><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option><option>ALL</option></select></div><div id="api-table"></div>`);drawAPIs()}else if(tab==="schema"){const m=CACHE.db?.models||[];v.innerHTML=panel("Data models",`${m.length} schema entities detected.`,m.length?m.map(x=>`<details><summary><code>${esc(x.name)}</code> <span class="muted">${esc(x.table||"")} · ${esc(x.file||"")}</span></summary><table><tr><th>Field</th><th>Type</th><th>Flags</th></tr>${(x.fields||[]).map(f=>`<tr><td><code>${esc(f.name)}</code></td><td>${esc(f.type)}</td><td class="muted">${[f.primary_key?"PK":"",f.unique?"UQ":"",f.nullable?"nullable":"",f.reference?"→ "+f.reference:""].filter(Boolean).join(" ")}</td></tr>`).join("")}</table></details>`).join("")+`<h3 style="margin-top:23px">Entity relationship diagram</h3><pre>${esc(CACHE.db?.diagram||"No diagram detected.")}</pre>`:empty("No data models detected."))}else if(tab==="env"){const vs=CACHE.env?.variables||[];v.innerHTML=panel("Environment requirements","Names and metadata only — values are never stored.",vs.length?`<table><tr><th>Name</th><th>Required</th><th>Category</th><th>Default</th></tr>${vs.map(x=>`<tr><td><code>${esc(x.name)}</code></td><td>${x.required?'<span class="change-add">Required</span>':'<span class="muted">Optional</span>'}</td><td>${esc(x.category||"—")}</td><td class="muted">${esc(x.default||"—")}</td></tr>`).join("")}</table>`:empty("No environment variables detected."))}else if(tab==="deps"){const d=CACHE.deps?.direct||[];v.innerHTML=panel("Dependencies","Direct packages detected from project manifests.",d.length?`<table><tr><th>Package</th><th>Version</th><th>Category</th></tr>${d.map(x=>`<tr><td><strong>${esc(x.name)}</strong></td><td class="muted">${esc(x.version||"—")}</td><td>${esc(x.category||"—")}</td></tr>`).join("")}</table>`:empty("No dependencies detected."))}else if(tab==="history"){const h=CACHE.history?.snapshots||[],d=CACHE.diff||{};v.innerHTML=panel("History & diff","Track context snapshots and changes over time.",`<div class="info-list" style="margin-bottom:22px"><div class="info-row"><span>Current diff</span><strong>${esc(d.summary||"No changes detected")}</strong></div><div class="info-row"><span>Added endpoints</span><strong class="change-add">${(d.added_endpoints||[]).length}</strong></div><div class="info-row"><span>Removed endpoints</span><strong class="change-del">${(d.removed_endpoints||[]).length}</strong></div></div><h3>Recent snapshots (${h.length})</h3>${h.length?`<table><tr><th>Hash</th><th>Time</th><th>Author</th><th>Message</th><th>Git</th></tr>${h.map(x=>`<tr><td><code>${esc((x.hash||"").slice(0,12))}</code></td><td class="muted">${esc(x.timestamp||"")}</td><td>${esc(x.author||"")}</td><td>${esc(x.message||"")}</td><td class="muted">${esc(x.git_branch||"")} ${esc((x.git_commit||"").slice(0,7))}</td></tr>`).join("")}</table>`:empty("No snapshots yet. Run ctx extract to create one.")}`)}else{v.innerHTML=panel("Search context","Find relevant project knowledge using local retrieval.",`<div class="toolbar"><input id="q" class="search-input" placeholder="Where is authentication handled?" onkeydown="if(event.key==='Enter')doSearch()"><button class="primary" onclick="doSearch()">Search context</button></div><div id="results" class="muted">Search across extracted context, endpoints, models and conventions.</div>`)}}
+function drawAPIs(){const fp=($("#f-path")||{}).value||"",fm=($("#f-method")||{}).value||"",eps=(CACHE.apis?.endpoints||[]).filter(e=>(!fp||e.path.toLowerCase().includes(fp.toLowerCase()))&&(!fm||e.method===fm));$("#api-table").innerHTML=eps.length?`<table><tr><th>Method</th><th>Path</th><th>Source</th><th>Auth</th></tr>${eps.map(e=>`<tr><td><span class="method ${esc(e.method)}">${esc(e.method)}</span></td><td><code>${esc(e.path)}</code></td><td class="muted">${esc(e.file||"")}${e.line?":"+e.line:""}</td><td>${e.auth_required?"🔒 Protected":"—"}</td></tr>`).join("")}</table>`:empty("No endpoints match this filter.")}
+async function doSearch(){const q=$("#q").value.trim();if(!q)return;$("#results").textContent="Searching local context…";try{const r=await j("/api/search?q="+encodeURIComponent(q));$("#results").innerHTML=(r.results||[]).map((x,i)=>`<div class="result"><b>${i+1}. [${esc(x.kind)}] ${esc(x.id)}</b> <span class="muted">${(x.score||0).toFixed(3)} · ${esc(x.source||"")}</span><p>${esc((x.text||"").slice(0,400))}</p></div>`).join("")||empty("No results for this query.")}catch(e){$("#results").textContent="Search failed: "+e}}
 loadAll();
 </script>
 </body>

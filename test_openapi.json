@@ -1,0 +1,637 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "CTX",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/diff": {
+      "delete": {
+        "summary": "ALL /api/diff",
+        "operationId": "s.handleDiff",
+        "tags": [
+          "diff"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "get": {
+        "summary": "ALL /api/diff",
+        "operationId": "s.handleDiff",
+        "tags": [
+          "diff"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "patch": {
+        "summary": "ALL /api/diff",
+        "operationId": "s.handleDiff",
+        "tags": [
+          "diff"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "post": {
+        "summary": "ALL /api/diff",
+        "operationId": "s.handleDiff",
+        "tags": [
+          "diff"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "put": {
+        "summary": "ALL /api/diff",
+        "operationId": "s.handleDiff",
+        "tags": [
+          "diff"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/history": {
+      "delete": {
+        "summary": "ALL /api/history",
+        "operationId": "s.handleHistory",
+        "tags": [
+          "history"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "get": {
+        "summary": "ALL /api/history",
+        "operationId": "s.handleHistory",
+        "tags": [
+          "history"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "patch": {
+        "summary": "ALL /api/history",
+        "operationId": "s.handleHistory",
+        "tags": [
+          "history"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "post": {
+        "summary": "ALL /api/history",
+        "operationId": "s.handleHistory",
+        "tags": [
+          "history"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "put": {
+        "summary": "ALL /api/history",
+        "operationId": "s.handleHistory",
+        "tags": [
+          "history"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/search": {
+      "delete": {
+        "summary": "ALL /api/search",
+        "operationId": "s.handleSearch",
+        "tags": [
+          "search"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "get": {
+        "summary": "ALL /api/search",
+        "operationId": "s.handleSearch",
+        "tags": [
+          "search"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "patch": {
+        "summary": "ALL /api/search",
+        "operationId": "s.handleSearch",
+        "tags": [
+          "search"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "post": {
+        "summary": "ALL /api/search",
+        "operationId": "s.handleSearch",
+        "tags": [
+          "search"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "put": {
+        "summary": "ALL /api/search",
+        "operationId": "s.handleSearch",
+        "tags": [
+          "search"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/chunk": {
+      "post": {
+        "summary": "POST /chunk",
+        "operationId": "chunk",
+        "tags": [
+          "chunk"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/extract/routes": {
+      "post": {
+        "summary": "POST /extract/routes",
+        "operationId": "extract_routes_ep",
+        "tags": [
+          "extract"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "GET /health",
+        "operationId": "health",
+        "tags": [
+          "health"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/mcp/tools/call": {
+      "delete": {
+        "summary": "ALL /mcp/tools/call",
+        "operationId": "s.handleToolCall",
+        "tags": [
+          "mcp"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "get": {
+        "summary": "ALL /mcp/tools/call",
+        "operationId": "s.handleToolCall",
+        "tags": [
+          "mcp"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "patch": {
+        "summary": "ALL /mcp/tools/call",
+        "operationId": "s.handleToolCall",
+        "tags": [
+          "mcp"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "post": {
+        "summary": "ALL /mcp/tools/call",
+        "operationId": "s.handleToolCall",
+        "tags": [
+          "mcp"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "put": {
+        "summary": "ALL /mcp/tools/call",
+        "operationId": "s.handleToolCall",
+        "tags": [
+          "mcp"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/search": {
+      "post": {
+        "summary": "POST /search",
+        "operationId": "search",
+        "tags": [
+          "search"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/summarize": {
+      "post": {
+        "summary": "POST /summarize",
+        "operationId": "summarize",
+        "tags": [
+          "summarize"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/ui": {
+      "delete": {
+        "summary": "ALL /ui",
+        "operationId": "serveUI",
+        "tags": [
+          "ui"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "get": {
+        "summary": "ALL /ui",
+        "operationId": "serveUI",
+        "tags": [
+          "ui"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "patch": {
+        "summary": "ALL /ui",
+        "operationId": "serveUI",
+        "tags": [
+          "ui"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "post": {
+        "summary": "ALL /ui",
+        "operationId": "serveUI",
+        "tags": [
+          "ui"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "put": {
+        "summary": "ALL /ui",
+        "operationId": "serveUI",
+        "tags": [
+          "ui"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/ui/": {
+      "delete": {
+        "summary": "ALL /ui/",
+        "operationId": "serveUI",
+        "tags": [
+          "ui"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "get": {
+        "summary": "ALL /ui/",
+        "operationId": "serveUI",
+        "tags": [
+          "ui"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "patch": {
+        "summary": "ALL /ui/",
+        "operationId": "serveUI",
+        "tags": [
+          "ui"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "post": {
+        "summary": "ALL /ui/",
+        "operationId": "serveUI",
+        "tags": [
+          "ui"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "put": {
+        "summary": "ALL /ui/",
+        "operationId": "serveUI",
+        "tags": [
+          "ui"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "GET /api/v1/health": {
+      "delete": {
+        "summary": "ALL GET /api/v1/health",
+        "operationId": "s.handleHealth",
+        "tags": [
+          "GET "
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "get": {
+        "summary": "ALL GET /api/v1/health",
+        "operationId": "s.handleHealth",
+        "tags": [
+          "GET "
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "patch": {
+        "summary": "ALL GET /api/v1/health",
+        "operationId": "s.handleHealth",
+        "tags": [
+          "GET "
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "post": {
+        "summary": "ALL GET /api/v1/health",
+        "operationId": "s.handleHealth",
+        "tags": [
+          "GET "
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "put": {
+        "summary": "ALL GET /api/v1/health",
+        "operationId": "s.handleHealth",
+        "tags": [
+          "GET "
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "POST /api/v1/auth/login": {
+      "delete": {
+        "summary": "ALL POST /api/v1/auth/login",
+        "operationId": "s.handleLogin",
+        "tags": [
+          "POST "
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "get": {
+        "summary": "ALL POST /api/v1/auth/login",
+        "operationId": "s.handleLogin",
+        "tags": [
+          "POST "
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "patch": {
+        "summary": "ALL POST /api/v1/auth/login",
+        "operationId": "s.handleLogin",
+        "tags": [
+          "POST "
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "post": {
+        "summary": "ALL POST /api/v1/auth/login",
+        "operationId": "s.handleLogin",
+        "tags": [
+          "POST "
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "put": {
+        "summary": "ALL POST /api/v1/auth/login",
+        "operationId": "s.handleLogin",
+        "tags": [
+          "POST "
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "POST /api/v1/auth/register": {
+      "delete": {
+        "summary": "ALL POST /api/v1/auth/register",
+        "operationId": "s.handleRegister",
+        "tags": [
+          "POST "
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "get": {
+        "summary": "ALL POST /api/v1/auth/register",
+        "operationId": "s.handleRegister",
+        "tags": [
+          "POST "
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "patch": {
+        "summary": "ALL POST /api/v1/auth/register",
+        "operationId": "s.handleRegister",
+        "tags": [
+          "POST "
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "post": {
+        "summary": "ALL POST /api/v1/auth/register",
+        "operationId": "s.handleRegister",
+        "tags": [
+          "POST "
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "put": {
+        "summary": "ALL POST /api/v1/auth/register",
+        "operationId": "s.handleRegister",
+        "tags": [
+          "POST "
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    }
+  }
+}

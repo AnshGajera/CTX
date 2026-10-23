@@ -143,8 +143,95 @@ func (e *DependencyExtractor) Extract(ctx *projctx.ProjectContext) error {
 	e.extractGo(dc)
 	e.extractPython(dc)
 	e.extractRust(dc)
+	e.extractNestedManifests(dc)
+	deduplicateDependencies(dc)
 	ctx.Dependencies = dc
 	return nil
+}
+
+func (e *DependencyExtractor) extractNestedManifests(dc *projctx.DependencyContext) {
+	_ = e.WalkFiles(func(path, rel string, info os.FileInfo) error {
+		if info.Size() > 2_000_000 {
+			return nil
+		}
+		base := strings.ToLower(filepath.Base(path))
+		switch base {
+		case "package.json":
+			if filepath.Clean(path) == filepath.Join(e.Root, "package.json") {
+				return nil
+			}
+			e.parseNodeManifest(path, dc)
+		case "requirements.txt", "requirements-dev.txt", "requirements-base.txt", "requirements-ml.txt":
+			if filepath.Clean(path) == filepath.Join(e.Root, base) {
+				return nil
+			}
+			e.parseRequirements(path, dc)
+		}
+		return nil
+	})
+}
+
+func (e *DependencyExtractor) parseNodeManifest(path string, dc *projctx.DependencyContext) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+	var pj struct {
+		Dependencies    map[string]string `json:"dependencies"`
+		DevDependencies map[string]string `json:"devDependencies"`
+	}
+	if json.Unmarshal(data, &pj) != nil {
+		return
+	}
+	for name, ver := range pj.Dependencies {
+		dc.Direct = append(dc.Direct, projctx.Dependency{Name: name, Version: ver, Purpose: inferPurpose(name), Category: inferCategory(name), Critical: criticalDeps[name]})
+	}
+	for name, ver := range pj.DevDependencies {
+		dc.Dev = append(dc.Dev, projctx.Dependency{Name: name, Version: ver, Purpose: inferPurpose(name), Category: inferCategory(name)})
+	}
+}
+
+func (e *DependencyExtractor) parseRequirements(path string, dc *projctx.DependencyContext) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(strings.SplitN(line, "#", 2)[0])
+		if line == "" || strings.HasPrefix(line, "-r ") || strings.HasPrefix(line, "--") {
+			continue
+		}
+		name, ver := line, ""
+		for _, sep := range []string{"==", ">=", "~=", "!=", "<=", ">"} {
+			if i := strings.Index(line, sep); i >= 0 {
+				name, ver = strings.TrimSpace(line[:i]), strings.TrimSpace(line[i+len(sep):])
+				break
+			}
+		}
+		name = strings.TrimSpace(strings.SplitN(name, "[", 2)[0])
+		if name == "" {
+			continue
+		}
+		dc.Direct = append(dc.Direct, projctx.Dependency{Name: name, Version: ver, Purpose: inferPurpose(name), Category: inferCategory(name), Critical: criticalDeps[strings.ToLower(name)]})
+	}
+}
+
+func deduplicateDependencies(dc *projctx.DependencyContext) {
+	dedupe := func(items []projctx.Dependency) []projctx.Dependency {
+		seen := map[string]bool{}
+		out := make([]projctx.Dependency, 0, len(items))
+		for _, item := range items {
+			key := strings.ToLower(item.Name) + "\x00" + item.Version
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			out = append(out, item)
+		}
+		return out
+	}
+	dc.Direct = dedupe(dc.Direct)
+	dc.Dev = dedupe(dc.Dev)
 }
 
 func (e *DependencyExtractor) extractNode(dc *projctx.DependencyContext) {
@@ -202,6 +289,9 @@ func (e *DependencyExtractor) extractGo(dc *projctx.DependencyContext) {
 				})
 			}
 		}
+	}
+	if err := sc.Err(); err != nil {
+		return
 	}
 }
 

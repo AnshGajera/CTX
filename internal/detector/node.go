@@ -37,6 +37,13 @@ func (c *nodeChecker) Name() string { return "node" }
 
 func (c *nodeChecker) Check(root string) (*CheckResult, error) {
 	pjPath := filepath.Join(root, "package.json")
+	if _, err := os.Stat(pjPath); err != nil {
+		files := findManifestFiles(root, map[string]bool{"package.json": true})
+		if len(files) == 0 {
+			return nil, nil
+		}
+		pjPath = files[0]
+	}
 	data, err := os.ReadFile(pjPath)
 	if err != nil {
 		return nil, nil
@@ -78,7 +85,7 @@ func (c *nodeChecker) Check(root string) (*CheckResult, error) {
 	} else {
 		res.Languages = append(res.Languages, projctx.Language{Name: "JavaScript", Percentage: 80})
 	}
-	res.PackageManager = detectNodePM(root)
+	res.PackageManager = detectNodePM(filepath.Dir(pjPath))
 	if pj.Workspaces != nil || fileExists(root, "lerna.json") || fileExists(root, "pnpm-workspace.yaml") {
 		res.IsMonorepo = true
 	}

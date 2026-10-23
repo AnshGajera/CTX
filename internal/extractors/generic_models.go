@@ -30,6 +30,7 @@ var (
 	reTSField        = regexp.MustCompile(`^\s*(\w+)([?!]?)\s*:\s*([\w\[\]<>]+)`)
 	rePyClass        = regexp.MustCompile(`^class\s+(\w+)\s*\(([^)]*)\)`)
 	reSqlaColumn     = regexp.MustCompile(`^\s*(\w+)\s*=\s*(?:db\.)?Column\s*\(\s*(\w+)`)
+	reSqlaMapped     = regexp.MustCompile(`^\s*(\w+)\s*:\s*Mapped\[(.*?)\]\s*=\s*mapped_column\s*\((.*?)\)`)
 	reDjangoField    = regexp.MustCompile(`^\s*(\w+)\s*=\s*models\.(\w+)\s*\(`)
 	reGoStruct       = regexp.MustCompile(`^type\s+(\w+)\s+struct\s*\{`)
 	reGoField        = regexp.MustCompile(`^\s*(\w+)\s+([\w\[\]\*\.]+)\s*` + "`" + `([^` + "`" + `]*)` + "`")
@@ -136,9 +137,13 @@ func (e *GenericModelsExtractor) parseJS(path, rel string, db *projctx.DatabaseC
 		no++
 		lines = append(lines, line{no, sc.Text()})
 	}
+	if err := sc.Err(); err != nil {
+		return
+	}
 	var fullB strings.Builder
 	for _, l := range lines {
-		fullB.WriteString(l.text + "\n")
+		fullB.WriteString(l.text)
+		fullB.WriteByte('\n')
 	}
 	full := fullB.String()
 	isMongoose := strings.Contains(full, "mongoose") || reMongooseSchema.MatchString(full)
@@ -239,6 +244,9 @@ func (e *GenericModelsExtractor) parsePython(path, rel string, db *projctx.Datab
 	for sc.Scan() {
 		lines = append(lines, sc.Text())
 	}
+	if err := sc.Err(); err != nil {
+		return
+	}
 	full := strings.Join(lines, "\n")
 	for i, l := range lines {
 		m := rePyClass.FindStringSubmatch(l)
@@ -248,7 +256,7 @@ func (e *GenericModelsExtractor) parsePython(path, rel string, db *projctx.Datab
 		name, bases := m[1], m[2]
 		kind := ""
 		switch {
-		case strings.Contains(bases, "db.Model") || strings.Contains(bases, "Base") && strings.Contains(full, "Column"):
+		case strings.Contains(bases, "db.Model") || (strings.Contains(bases, "Base") && (strings.Contains(full, "Column") || strings.Contains(full, "mapped_column"))):
 			kind = "sqlalchemy"
 		case strings.Contains(bases, "models.Model") || strings.Contains(bases, "Model"):
 			// disambiguate django vs sqlalchemy by field syntax below
@@ -261,6 +269,10 @@ func (e *GenericModelsExtractor) parsePython(path, rel string, db *projctx.Datab
 					break
 				}
 				if reSqlaColumn.MatchString(lines[k]) {
+					kind = "sqlalchemy"
+					break
+				}
+				if reSqlaMapped.MatchString(lines[k]) {
 					kind = "sqlalchemy"
 					break
 				}
@@ -284,6 +296,13 @@ func (e *GenericModelsExtractor) parsePython(path, rel string, db *projctx.Datab
 				if fm := reSqlaColumn.FindStringSubmatch(t); len(fm) == 3 {
 					model.Fields = append(model.Fields, projctx.ModelField{Name: fm[1], Type: fm[2]})
 				}
+				if fm := reSqlaMapped.FindStringSubmatch(t); len(fm) == 4 {
+					field := projctx.ModelField{Name: fm[1], Type: strings.TrimSpace(fm[2])}
+					args := strings.ToLower(fm[3])
+					field.PrimaryKey = strings.Contains(args, "primary_key=true")
+					field.Unique = strings.Contains(args, "unique=true")
+					model.Fields = append(model.Fields, field)
+				}
 			}
 		}
 		db.Models = append(db.Models, model)
@@ -301,6 +320,9 @@ func (e *GenericModelsExtractor) parseGo(path, rel string, db *projctx.DatabaseC
 	sc.Buffer(make([]byte, 128*1024), 2*1024*1024)
 	for sc.Scan() {
 		lines = append(lines, sc.Text())
+	}
+	if err := sc.Err(); err != nil {
+		return
 	}
 	for i, l := range lines {
 		m := reGoStruct.FindStringSubmatch(l)
@@ -364,18 +386,30 @@ func genericMermaid(models []projctx.DatabaseModel, rels []projctx.Relation) str
 	var b strings.Builder
 	b.WriteString("erDiagram\n")
 	for _, m := range models {
-		b.WriteString("  " + m.Name + " {\n")
+		b.WriteString("  ")
+		b.WriteString(m.Name)
+		b.WriteString(" {\n")
 		for _, f := range m.Fields {
 			if f.Reference != "" {
 				continue
 			}
 			typ := strings.ReplaceAll(strings.ReplaceAll(f.Type, " ", "_"), ":", "_")
-			b.WriteString("    " + typ + " " + f.Name + "\n")
+			b.WriteString("    ")
+			b.WriteString(typ)
+			b.WriteByte(' ')
+			b.WriteString(f.Name)
+			b.WriteByte('\n')
 		}
 		b.WriteString("  }\n")
 	}
 	for _, r := range rels {
-		b.WriteString("  " + r.From + " ||--o{ " + r.To + " : \"" + r.FieldName + "\"\n")
+		b.WriteString("  ")
+		b.WriteString(r.From)
+		b.WriteString(" ||--o{ ")
+		b.WriteString(r.To)
+		b.WriteString(" : \"")
+		b.WriteString(r.FieldName)
+		b.WriteString("\"\n")
 	}
 	return b.String()
 }

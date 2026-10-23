@@ -5,18 +5,21 @@ COMMIT?=$(shell git rev-parse --short HEAD 2>/dev/null || echo none)
 DATE?=$(shell date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo unknown)
 LDFLAGS=-s -w -X $(PKG)/internal/version.Version=$(VERSION) -X $(PKG)/internal/version.Commit=$(COMMIT) -X $(PKG)/internal/version.Date=$(DATE)
 
-.PHONY: build test lint install clean release dev test-go test-python
+.PHONY: build test lint install clean release dev test-go test-server test-python
 
 build:
 	go build -ldflags "$(LDFLAGS)" -o $(BINARY) ./cmd/ctx
 
-test: test-go test-python
+test: test-go test-server test-python
 
 test-go:
 	go test ./... -race
 
+test-server:
+	@cd server && CGO_ENABLED=1 go test ./... -race
+
 test-python:
-	@cd ctx-ml && python -m pytest tests -q 2>/dev/null || echo "Python tests skipped (missing deps)"
+	@cd ctx-ml && python -m pytest tests -q
 
 lint:
 	@command -v golangci-lint >/dev/null 2>&1 && golangci-lint run ./... || go vet ./...

@@ -18,10 +18,10 @@ import (
 	"github.com/AnshGajera/CTX/internal/privacy"
 	"github.com/AnshGajera/CTX/internal/setup"
 	"github.com/AnshGajera/CTX/internal/tui"
+	"github.com/AnshGajera/CTX/internal/version"
 	"github.com/AnshGajera/CTX/internal/versioning"
 	"github.com/fatih/color"
 	"github.com/urfave/cli/v2"
-	"github.com/AnshGajera/CTX/internal/version"
 )
 
 var defaultIgnore = `# ctx ignores
@@ -293,6 +293,7 @@ func runExtract(root string, quiet, onCommit bool, sections []string) (bool, err
 	if err != nil {
 		return false, fmt.Errorf("not initialized (run ctx init): %w", err)
 	}
+
 	cfg, cfgErr := config.Load(config.ProjectConfigPath(root))
 	if cfgErr != nil {
 		color.Yellow("Warning: could not load config, using defaults: %v", cfgErr)
@@ -304,6 +305,7 @@ func runExtract(root string, quiet, onCommit bool, sections []string) (bool, err
 			if quiet {
 				return deduped, nil
 			}
+
 			if deduped {
 				head, _ := versioning.NewContextStore(filepath.Join(root, ".ctx")).GetHead()
 				color.Cyan("No file changes — HEAD unchanged (%s)", shortHash(head))
@@ -364,6 +366,32 @@ func runExtract(root string, quiet, onCommit bool, sections []string) (bool, err
 		}
 	}
 	return deduped, nil
+}
+
+// previewExtract performs extraction and sanitization without writing files.
+func previewExtract(root string, sections []string) (*projctx.ProjectContext, error) {
+	manifest, err := projctx.LoadManifest(filepath.Join(root, ".ctx", "manifest.json"))
+	if err != nil {
+		return nil, fmt.Errorf("not initialized (run ctx init): %w", err)
+	}
+	cfg, err := config.Load(config.ProjectConfigPath(root))
+	if err != nil {
+		cfg = config.Default()
+	}
+	eng := engine.NewExtractionEngine(root, &manifest.Profile, cfg.Core.MLURL, resolveSections(sections, cfg))
+	ctx, err := eng.Extract()
+	if err != nil {
+		return nil, err
+	}
+	if manifest.ContextID != "" {
+		ctx.ContextID = manifest.ContextID
+	}
+	san := privacy.NewSanitizer(privacy.SanitizeConfig{
+		RedactValues: cfg.Privacy.RedactValues, HashIdentifiers: cfg.Privacy.HashIdentifiers,
+		ExcludePatterns: cfg.Privacy.ExcludePatterns,
+	})
+	san.SanitizeContext(ctx)
+	return ctx, nil
 }
 
 // tryFastRefresh skips the full scan when the file tree is unchanged,

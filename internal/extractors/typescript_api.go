@@ -87,6 +87,9 @@ func (e *TypeScriptAPIExtractor) Extract(ctx *projctx.ProjectContext) error {
 				endpoints = append(endpoints, ep)
 			}
 		}
+		if err := sc.Err(); err != nil {
+			return nil
+		}
 		return nil
 	})
 	if len(endpoints) == 0 {

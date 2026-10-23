@@ -115,6 +115,9 @@ func (e *PrismaExtractor) Extract(ctx *projctx.ProjectContext) error {
 			}
 		}
 	}
+	if err := sc.Err(); err != nil {
+		return nil
+	}
 	db.Diagram = mermaidER(db.Models, db.Relations)
 	if ctx.Database == nil {
 		ctx.Database = db

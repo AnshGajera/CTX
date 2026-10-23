@@ -13,20 +13,16 @@ import (
 // PythonAPIExtractor extracts Flask/FastAPI/Django routes.
 type PythonAPIExtractor struct{ Base }
 
-func NewPythonAPI(root string) *PythonAPIExtractor {
-	return &PythonAPIExtractor{Base: NewBase(root)}
-}
-
-func (e *PythonAPIExtractor) Name() string { return "python-api" }
+func NewPythonAPI(root string) *PythonAPIExtractor { return &PythonAPIExtractor{Base: NewBase(root)} }
+func (e *PythonAPIExtractor) Name() string         { return "python-api" }
 
 var (
 	reFlaskRoute   = regexp.MustCompile(`@\w+\.route\(\s*['"]([^'"]+)['"](?:[^)]*methods\s*=\s*\[([^\]]+)\])?`)
 	reFastAPIRoute = regexp.MustCompile(`@\w+\.(get|post|put|patch|delete)\(\s*['"]([^'"]+)['"]`)
 	reDjangoPath   = regexp.MustCompile(`path\(\s*['"]([^'"]+)['"]\s*,\s*([A-Za-z0-9_.]+)`)
-	reDefLine      = regexp.MustCompile(`^\s*def\s+(\w+)\s*\(`)
+	reDefLine      = regexp.MustCompile(`^\s*(?:async\s+)?def\s+(\w+)\s*\(`)
 )
 
-// isTestPython skips test files/dirs so fixtures don't pollute routes.
 func isTestPython(rel string) bool {
 	base := filepath.Base(rel)
 	slash := filepathToSlash(rel)
@@ -35,13 +31,16 @@ func isTestPython(rel string) bool {
 		strings.HasPrefix(slash, "tests/") || strings.HasPrefix(slash, "test/")
 }
 
+type pythonRoute struct {
+	method, route, description string
+	line                       int
+	auth                       bool
+}
+
 func (e *PythonAPIExtractor) Extract(ctx *projctx.ProjectContext) error {
 	var endpoints []projctx.APIEndpoint
 	_ = e.WalkFiles(func(path, rel string, info os.FileInfo) error {
-		if !strings.HasSuffix(path, ".py") || isTestPython(rel) {
-			return nil
-		}
-		if info.Size() > 1_000_000 {
+		if !strings.HasSuffix(path, ".py") || isTestPython(rel) || info.Size() > 1_000_000 {
 			return nil
 		}
 		f, err := os.Open(path)
@@ -51,66 +50,47 @@ func (e *PythonAPIExtractor) Extract(ctx *projctx.ProjectContext) error {
 		defer f.Close()
 		sc := bufio.NewScanner(f)
 		sc.Buffer(make([]byte, 128*1024), 2*1024*1024)
-		lineNo := 0
-		pendingHandler := ""
-		pendingLines := []struct {
-			method, route string
-			line          int
-		}{}
-		flush := func(handler string) {
-			for _, p := range pendingLines {
-				endpoints = append(endpoints, projctx.APIEndpoint{Method: p.method, Path: p.route, Handler: handler, File: filepath.ToSlash(rel), Line: p.line, Parameters: pathParams(p.route)})
-			}
-			pendingLines = nil
-		}
+		var lines []string
 		for sc.Scan() {
-			lineNo++
-			line := sc.Text()
-			// A line may hold several decorators/calls; match all.
+			lines = append(lines, sc.Text())
+		}
+		if err := sc.Err(); err != nil {
+			return nil
+		}
+		var pending []pythonRoute
+		for index, line := range lines {
+			lineNo := index + 1
 			for _, m := range reFastAPIRoute.FindAllStringSubmatch(line, -1) {
-				if len(m) != 3 {
-					continue
-				}
-				pendingLines = append(pendingLines, struct {
-					method, route string
-					line          int
-				}{strings.ToUpper(m[1]), m[2], lineNo})
+				pending = append(pending, pythonRoute{method: strings.ToUpper(m[1]), route: m[2], line: lineNo, auth: isAuthLine(line)})
 			}
 			for _, m := range reFlaskRoute.FindAllStringSubmatch(line, -1) {
-				if len(m) < 2 {
-					continue
-				}
 				method := "GET"
-				if len(m) >= 3 && m[2] != "" {
-					method = strings.ToUpper(strings.Trim(m[2], "'\" "))
-					if idx := strings.Index(method, ","); idx > 0 {
-						method = strings.TrimSpace(method[:idx])
-					}
-					method = strings.Trim(method, "'\"")
+				if len(m) > 2 && m[2] != "" {
+					method = strings.ToUpper(strings.Trim(strings.Split(m[2], ",")[0], "'\" "))
 				}
-				pendingLines = append(pendingLines, struct {
-					method, route string
-					line          int
-				}{method, m[1], lineNo})
+				pending = append(pending, pythonRoute{method: method, route: m[1], line: lineNo, auth: isAuthLine(line)})
 			}
 			for _, m := range reDjangoPath.FindAllStringSubmatch(line, -1) {
-				if len(m) != 3 {
-					continue
-				}
 				endpoints = append(endpoints, projctx.APIEndpoint{Method: "ALL", Path: "/" + m[1], Handler: m[2], File: filepath.ToSlash(rel), Line: lineNo, Parameters: pathParams(m[1])})
 			}
-			if m := reDefLine.FindStringSubmatch(line); len(m) == 2 {
-				pendingHandler = m[1]
-				if len(pendingLines) > 0 {
-					flush(pendingHandler)
+			if m := reDefLine.FindStringSubmatch(line); len(m) == 2 && len(pending) > 0 {
+				description := pythonDocstring(lines, index)
+				for _, route := range pending {
+					if description == "" {
+						description = route.description
+					}
+					endpoints = append(endpoints, projctx.APIEndpoint{
+						Method: route.method, Path: route.route, Handler: m[1],
+						File: filepath.ToSlash(rel), Line: route.line, Description: description,
+						Parameters:   pathParams(route.route),
+						AuthRequired: route.auth || isAuthLine(line) || strings.Contains(strings.ToLower(m[1]), "auth"),
+					})
 				}
-				_ = pendingHandler
-				continue
+				pending = nil
 			}
 		}
-		// decorators at EOF without def seen
-		for _, p := range pendingLines {
-			endpoints = append(endpoints, projctx.APIEndpoint{Method: p.method, Path: p.route, Handler: "", File: filepath.ToSlash(rel), Line: p.line, Parameters: pathParams(p.route)})
+		for _, route := range pending {
+			endpoints = append(endpoints, projctx.APIEndpoint{Method: route.method, Path: route.route, File: filepath.ToSlash(rel), Line: route.line, Parameters: pathParams(route.route), AuthRequired: route.auth})
 		}
 		return nil
 	})
@@ -122,4 +102,35 @@ func (e *PythonAPIExtractor) Extract(ctx *projctx.ProjectContext) error {
 	}
 	ctx.APIs.Endpoints = append(ctx.APIs.Endpoints, endpoints...)
 	return nil
+}
+
+func isAuthLine(line string) bool {
+	lower := strings.ToLower(line)
+	for _, marker := range []string{"depends(get_current_user", "depends(require_auth", "depends(auth", "requires_auth", "jwt", "current_user", "admin_only"} {
+		if strings.Contains(lower, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func pythonDocstring(lines []string, defIndex int) string {
+	for i := defIndex + 1; i < len(lines); i++ {
+		line := strings.TrimSpace(lines[i])
+		if line == "" {
+			continue
+		}
+		if strings.HasPrefix(line, `"""`) || strings.HasPrefix(line, "'''") {
+			quote := line[:3]
+			text := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(line, quote), quote))
+			if text != "" {
+				return text
+			}
+			if i+1 < len(lines) {
+				return strings.TrimSpace(lines[i+1])
+			}
+		}
+		break
+	}
+	return ""
 }

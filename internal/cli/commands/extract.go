@@ -14,6 +14,7 @@ func ExtractCommand() *cli.Command {
 		Usage: "Extract project context",
 		Flags: []cli.Flag{
 			&cli.BoolFlag{Name: "quiet", Usage: "suppress output"},
+			&cli.BoolFlag{Name: "dry-run", Usage: "print sanitized context without writing files or snapshots"},
 			&cli.BoolFlag{Name: "on-commit", Usage: "mark extraction as on-commit"},
 			&cli.StringSliceFlag{Name: "sections", Usage: "limit sections (repeatable)"},
 			jsonFlag(),
@@ -24,6 +25,17 @@ func ExtractCommand() *cli.Command {
 				return err
 			}
 			jsonMode := c.Bool("json")
+			if c.Bool("dry-run") {
+				ctx, err := previewExtract(cwd, c.StringSlice("sections"))
+				if err != nil {
+					return err
+				}
+				encoder := json.NewEncoder(os.Stdout)
+				if !jsonMode {
+					encoder.SetIndent("", "  ")
+				}
+				return encoder.Encode(ctx)
+			}
 			deduped, err := runExtract(cwd, c.Bool("quiet") || jsonMode, c.Bool("on-commit"), c.StringSlice("sections"))
 			if err != nil {
 				return err

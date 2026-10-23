@@ -45,3 +45,20 @@ jobs:
         run: |
           pip install -r ctx-ml/requirements.txt
           python -m pytest ctx-ml/tests -q
+
+      - name: Test server
+        working-directory: server
+        env:
+          CGO_ENABLED: "1"
+        run: go test ./... -race
+
+      - name: Vet server
+        working-directory: server
+        env:
+          CGO_ENABLED: "1"
+        run: go vet ./...
+
+      - name: Validate Docker Compose
+        env:
+          CTX_JWT_SECRET: ci-review-secret
+        run: docker compose config

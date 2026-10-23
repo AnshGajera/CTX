@@ -47,6 +47,9 @@ func (e *TODOExtractor) Extract(ctx *projctx.ProjectContext) error {
 				}
 			}
 		}
+		if err := sc.Err(); err != nil {
+			return nil
+		}
 		return nil
 	})
 	if ctx.CurrentState == nil {

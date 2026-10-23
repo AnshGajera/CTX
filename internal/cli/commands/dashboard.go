@@ -13,9 +13,9 @@ import (
 	"github.com/AnshGajera/CTX/internal/mcp"
 	"github.com/AnshGajera/CTX/internal/openapi"
 	"github.com/AnshGajera/CTX/internal/tui"
+	"github.com/AnshGajera/CTX/internal/version"
 	"github.com/AnshGajera/CTX/internal/versioning"
 	"github.com/urfave/cli/v2"
-	"github.com/AnshGajera/CTX/internal/version"
 )
 
 // DashboardCommand implements `ctx dashboard`.
@@ -55,16 +55,19 @@ func (b *dashboardBackend) Title() string {
 	head, _ := versioning.NewContextStore(filepath.Join(b.root, ".ctx")).GetHead()
 	return fmt.Sprintf("%s · %s · %s", ctx.ProjectName, shortHash(head), gitBranchOf(ctx))
 }
+
 // GetStatus satisfies the tui.DashboardBackend interface requirements.
 func (d *dashboardBackend) GetStatus() string {
 	// You can replace this string with dynamic health-check logic later
 	return "Online - Dashboard Ready"
 }
+
 // GetVersion satisfies the tui.DashboardBackend interface requirements.
 func (d *dashboardBackend) GetVersion() string {
 	// Return the current release version
 	return version.Version
 }
+
 // PerformAction satisfies the tui.DashboardBackend interface requirements.
 func (d *dashboardBackend) PerformAction(actionKey string) error {
 	// Route actions triggered by the TUI or return nil for now
@@ -156,6 +159,7 @@ func (b *dashboardBackend) ToggleServe(port int) (string, error) {
 	}
 	store := versioning.NewContextStore(filepath.Join(b.root, ".ctx"))
 	srv := mcp.NewMCPServer(b.root, store, port)
+	srv.SetUIEnabled(true)
 	go func() { _ = srv.Start() }() //nolint:errcheck
 	b.serving = true
 	b.serveAddr = fmt.Sprintf("http://localhost:%d", port)

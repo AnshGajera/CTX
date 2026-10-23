@@ -9,6 +9,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/urfave/cli/v2 v2.27.5
+	golang.org/x/term v0.35.0
 )
 
 require (

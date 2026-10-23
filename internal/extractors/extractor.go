@@ -54,6 +54,9 @@ func LoadIgnore(root string) []string {
 		}
 		patterns = append(patterns, line)
 	}
+	if err := sc.Err(); err != nil {
+		return patterns
+	}
 	return patterns
 }
 
